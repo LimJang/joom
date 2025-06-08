@@ -1,0 +1,36 @@
+# 빌드 파일들
+build/
+*.o
+*.dylib
+*.so
+*.dll
+*.exe
+
+# CMake 파일들
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# IDE 파일들
+.vscode/
+.idea/
+*.xcodeproj/
+*.vcxproj*
+
+# macOS 파일들
+.DS_Store
+*.dSYM/
+
+# 임시 파일들
+*.tmp
+*.temp
+*~
+
+# 로그 파일들
+*.log
+
+# 백업 파일들
+CMakeLists_pkgconfig.txt
+build_new.sh
+build.sh

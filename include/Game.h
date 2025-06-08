@@ -1,0 +1,48 @@
+#pragma once
+#include <SDL2/SDL.h>
+#include "Player.h"
+#include "Map.h"
+#include "Renderer.h"
+#include "TextureManager.h"
+#include "HUD.h"
+#include "LightSystem.h"
+
+class Game {
+private:
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    bool running;
+    Player* player;
+    Map* map;
+    class Renderer* gameRenderer;
+    TextureManager* textureManager;
+    HUD* hud;
+    LightSystem* lightSystem;
+    
+    const int WINDOW_WIDTH = 800;
+    const int WINDOW_HEIGHT = 600;
+    
+    // FPS 계산
+    Uint32 frameCount;
+    Uint32 fpsTimer;
+    float currentFPS;
+    
+    // 키 입력 상태 추적
+    bool fKeyPressed;
+    bool fKeyWasPressed;
+    
+    // 타이밍 관련
+    Uint32 lastFrameTime;
+    
+public:
+    Game();
+    ~Game();
+    
+    bool initialize();
+    void run();
+    void handleEvents(float deltaTime);
+    void update(float deltaTime);
+    void render();
+    void cleanup();
+    void calculateFPS();
+};
