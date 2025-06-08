@@ -61,16 +61,24 @@ git remote add origin https://github.com/LimJang/joom.git
 echo "📊 Current project status:"
 echo "   - Core engine: ✅ Complete"
 echo "   - Performance: ✅ Optimized (60 FPS)"
-echo "   - Lighting system: ✅ Advanced flashlight"
+echo "   - Lighting system: ✅ Enhanced flashlight (90° cone)"
+echo "   - Audio system: ✅ Procedural sounds with reverb"
+echo "   - Debug cleanup: ✅ Clean console output"
 echo "   - HUD interface: ✅ Complete"
-echo "   - Floor/ceiling: ✅ Cave atmosphere"
+echo "   - Cave atmosphere: ✅ Immersive environment"
 echo ""
 
 # 모든 파일 스테이징
 git add .
 
 # 커밋 메시지
-COMMIT_MSG="🎮 Performance-Optimized Doom-Style Raycasting Engine
+COMMIT_MSG="🎮 Enhanced Doom-Style Raycasting Engine v2.0
+
+🔦 Latest Improvements:
+- Expanded flashlight cone to 90° for better visibility
+- Cleaned up all debugging output for professional experience
+- Optimized lighting calculations for smoother performance
+- Enhanced cave exploration atmosphere
 
 ✨ Core Features:
 - Advanced raycasting 3D engine with DDA algorithm
@@ -81,21 +89,31 @@ COMMIT_MSG="🎮 Performance-Optimized Doom-Style Raycasting Engine
 - Precision collision detection
 - Atmospheric cave environment with floor/ceiling
 
-🔦 Lighting System:
-- Dynamic flashlight with cone-shaped beam (F key toggle)
-- Distance-based light attenuation
-- Directional lighting calculations
+🔦 Advanced Lighting System:
+- Wide-angle flashlight with 90° cone-shaped beam (F key toggle)
+- Distance-based light attenuation with realistic physics
+- Directional lighting calculations for authentic cave feel
+- Sharp beam boundaries with dramatic light/dark transitions
 - HUD flashlight status indicator
+
+🎵 Procedural Audio System:
+- Realistic shoe footsteps with heel clicks
+- Professional cave reverb with 15 reflections
+- Flashlight toggle sounds
+- Volume controls with +/- keys
+- Custom sound file loading support
 
 ⚡ Performance Optimizations:
 - Stable 60 FPS with VSync support
 - Optimized floor/ceiling rendering
 - Frame-rate independent movement
 - Efficient memory management
+- Clean console output (debug-free)
 
 🛠️ Technical Stack:
 - C++17 with modern architecture
 - SDL2 for graphics and input
+- SDL_mixer for advanced audio
 - CMake cross-platform build system
 - Modular component design
 - Comprehensive error handling
@@ -105,14 +123,17 @@ COMMIT_MSG="🎮 Performance-Optimized Doom-Style Raycasting Engine
 - A/D: Strafe left/right
 - ←/→: Turn left/right  
 - F: Toggle flashlight
+- +/-: Adjust volume
 - ESC: Exit game
 
 🏗️ Build Instructions:
-1. Install SDL2: brew install sdl2 (macOS)
+1. Install dependencies: brew install sdl2 sdl2_mixer sdl2_image (macOS)
 2. Build: ./build.sh
-3. Run: cd build && ./Joom
+3. Run: cd build && ./joom
 
-Ready for distribution and further development!"
+🎮 Game Experience:
+Ready for authentic cave exploration with professional lighting and audio!
+Perfect for game development education and retro gaming enthusiasts."
 
 # 커밋 실행
 git commit -m "$COMMIT_MSG"
@@ -132,14 +153,14 @@ if [ $? -eq 0 ]; then
     echo "   git clone https://github.com/LimJang/joom.git"
     echo "   cd joom"
     echo "   ./build.sh"
-    echo "   cd build && ./Joom"
+    echo "   cd build && ./joom"
     echo ""
-    echo "🎮 Game features:"
-    echo "   - 60 FPS performance"
-    echo "   - Advanced lighting system"
-    echo "   - Atmospheric cave environment"
-    echo "   - Complete HUD interface"
-    echo "   - Smooth controls and movement"
+    echo "🎮 Latest features:"
+    echo "   - 90° wide flashlight beam"
+    echo "   - Clean debug-free experience"
+    echo "   - Professional cave atmosphere"
+    echo "   - Enhanced audio with reverb"
+    echo "   - Optimized 60 FPS performance"
 else
     echo "❌ Push failed! Please check:"
     echo "   1. GitHub credentials are set up"
@@ -149,6 +170,6 @@ else
     echo "💡 Alternative manual push:"
     echo "   git remote add origin https://github.com/LimJang/joom.git"
     echo "   git add ."
-    echo "   git commit -m 'Performance optimized engine'"
+    echo "   git commit -m 'Enhanced lighting and debug cleanup'"
     echo "   git push -u origin main"
 fi

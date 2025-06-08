@@ -1,0 +1,20 @@
+void HUD::renderControls() {
+    int x = screenWidth - 220;
+    int y = screenHeight - 140;
+    
+    SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255); // 연한 회색
+    
+    // 컨트롤 가이드
+    renderText("CONTROLS", x, y, 1);
+    renderText("WASD: MOVE", x, y + 15, 1);
+    renderText("ARROWS: TURN", x, y + 25, 1);
+    renderText("F: FLASHLIGHT", x, y + 35, 1);
+    renderText("C: CUSTOM SOUNDS", x, y + 45, 1);
+    
+    if (audioEnabled) {
+        renderText("+/-: VOLUME", x, y + 55, 1);
+        renderText("1-5: TEST SOUNDS", x, y + 65, 1);
+    }
+    
+    renderText("ESC: EXIT", x, y + 75, 1);
+}

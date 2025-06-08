@@ -6,8 +6,8 @@
 #endif
 
 LightSystem::LightSystem() 
-    : flashlightIntensity(0.8f), flashlightRange(10.0f), 
-      flashlightConeAngle(M_PI / 6.0f), ambientLight(0.1f), flashlightEnabled(true) {
+    : flashlightIntensity(1.2f), flashlightRange(6.0f), 
+      flashlightConeAngle(M_PI / 2.0f), ambientLight(0.05f), flashlightEnabled(true) {
 }
 
 LightSystem::~LightSystem() {
@@ -18,7 +18,7 @@ void LightSystem::toggleFlashlight() {
 }
 
 void LightSystem::setFlashlightIntensity(float intensity) {
-    flashlightIntensity = std::clamp(intensity, 0.0f, 1.0f);
+    flashlightIntensity = std::clamp(intensity, 0.0f, 2.0f);
 }
 
 void LightSystem::setFlashlightRange(float range) {
@@ -31,8 +31,8 @@ void LightSystem::setAmbientLight(float ambient) {
 
 float LightSystem::calculateLighting(float playerX, float playerY, float playerAngle,
                                    float targetX, float targetY, float distance) const {
-    // 기본 환경광
-    float totalLight = ambientLight;
+    // 매우 어두운 기본 환경 (99.9% 어둠)
+    float totalLight = ambientLight * 0.001f;
     
     if (flashlightEnabled) {
         // 타겟 방향 계산
@@ -46,8 +46,10 @@ float LightSystem::calculateLighting(float playerX, float playerY, float playerA
         // 거리 감쇠 적용
         float attenuation = calculateDistanceAttenuation(distance);
         
-        // 손전등 조명 추가
-        totalLight += flashlightIntensity * directionalLight * attenuation;
+        // 손전등 조명 추가 (극적인 반차)
+        if (directionalLight > 0.0f) {
+            totalLight += flashlightIntensity * directionalLight * attenuation;
+        }
     }
     
     // 최종 조명값을 0.0 ~ 1.0 범위로 제한
@@ -67,29 +69,49 @@ float LightSystem::calculateDirectionalLight(float playerAngle, float targetAngl
     
     // 손전등 원뿔 범위 내에 있는지 확인
     if (angleDiff <= flashlightConeAngle) {
-        // 중심에서 가장자리로 갈수록 밝기 감소 (코사인 커브)
-        float coneIntensity = cos(angleDiff / flashlightConeAngle * M_PI / 2.0f);
+        // 중심에서 가장자리로 갈수록 극적으로 밝기 감소
+        float normalizedAngle = angleDiff / flashlightConeAngle;
+        
+        // 더 극적인 감쇠 커브 (낙하산 형태)
+        float coneIntensity = cos(normalizedAngle * M_PI / 2.0f);
+        coneIntensity = pow(coneIntensity, 4.0f); // 4제곱으로 더욱 극적인 감쇠
+        
         return coneIntensity;
     }
     
-    return 0.0f; // 원뿔 범위 밖
+    return 0.0f; // 원뿔 범위 밖은 완전히 어둠
 }
 
 float LightSystem::calculateDistanceAttenuation(float distance) const {
     if (distance <= 0.0f) return 1.0f;
     
-    // 거리에 따른 제곱 감쇠 (현실적인 조명)
-    float attenuation = 1.0f / (1.0f + 0.1f * distance + 0.01f * distance * distance);
+    // 올바른 거리 감쇠 공식 (최대값 1.0)
+    float attenuation = 1.0f / (1.0f + 0.3f * distance + 0.15f * distance * distance);
     
     // 손전등 사거리 제한
     if (distance > flashlightRange) {
-        float fadeDistance = 2.0f; // 페이드 아웃 거리
+        float fadeDistance = 1.5f;
         float fadeStart = flashlightRange - fadeDistance;
         
-        if (distance > fadeStart) {
+        if (distance > fadeStart && fadeStart > 0) {
             float fadeRatio = (distance - fadeStart) / fadeDistance;
-            attenuation *= std::max(0.0f, 1.0f - fadeRatio);
+            
+            // fadeRatio가 1 이상이면 완전 어둠
+            if (fadeRatio >= 1.0f) {
+                attenuation *= 0.01f;
+            } else {
+                attenuation *= std::max(0.01f, pow(1.0f - fadeRatio, 4.0f));
+            }
+        } else if (distance > flashlightRange) {
+            attenuation *= 0.01f;
         }
+    }
+    
+    // 감쇠값이 1을 초과하지 않도록 수동 제한 (0 미만도 방지)
+    if (attenuation > 1.0f) {
+        attenuation = 0.01f;
+    } else if (attenuation < 0.0f) {
+        attenuation = 0.0f;
     }
     
     return attenuation;

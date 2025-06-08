@@ -5,7 +5,8 @@
 
 HUD::HUD(SDL_Renderer* sdlRenderer, int width, int height) 
     : renderer(sdlRenderer), screenWidth(width), screenHeight(height),
-      health(100), maxHealth(100), ammo(50), maxAmmo(200), score(0), fps(60.0f), flashlightOn(true) {
+      health(100), maxHealth(100), ammo(50), maxAmmo(200), score(0), fps(60.0f), 
+      flashlightOn(true), audioEnabled(true), masterVolume(70) {
 }
 
 HUD::~HUD() {
@@ -19,6 +20,8 @@ void HUD::render() {
     renderFPS();
     renderCrosshair();
     renderFlashlightStatus();
+    renderAudioStatus();
+    renderControls();
 }
 
 void HUD::renderHealthBar() {
@@ -113,22 +116,99 @@ void HUD::renderFlashlightStatus() {
         SDL_Rect lightIcon = {x + 80, y + 2, 12, 8};
         SDL_RenderFillRect(renderer, &lightIcon);
         
-        // 빛 빔기
+        // 빛 빔
         for (int i = 0; i < 3; i++) {
             SDL_RenderDrawLine(renderer, x + 92 + i * 4, y + 6, x + 96 + i * 4, y + 6);
         }
     } else {
-        SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255); // 회색 (꺼짐)
-        renderText("LIGHT OFF", x, y);
+        // 손전등이 꺼져있으면 경고 표시
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // 빨간색 (위험)
+        renderText("TOTAL DARKNESS", x, y);
+        renderText("PRESS F TO SURVIVE", x, y + 15);
         
-        // 꺼진 아이콘
-        SDL_Rect lightIcon = {x + 80, y + 2, 12, 8};
-        SDL_RenderDrawRect(renderer, &lightIcon);
+        // 깜빡이는 경고 아이콘
+        static int blinkTimer = 0;
+        blinkTimer++;
+        
+        if ((blinkTimer / 30) % 2 == 0) { // 30프레임마다 깜빡
+            SDL_SetRenderDrawColor(renderer, 255, 100, 100, 255);
+            SDL_Rect warningIcon = {x + 160, y + 2, 16, 12};
+            SDL_RenderFillRect(renderer, &warningIcon);
+            
+            // 느낌표 (!)
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderDrawLine(renderer, x + 168, y + 3, x + 168, y + 9);
+            SDL_Rect dot = {x + 167, y + 11, 2, 2};
+            SDL_RenderFillRect(renderer, &dot);
+        }
+    }
+}
+
+void HUD::renderAudioStatus() {
+    int x = 20;
+    int y = 50; // 손전등 상태 아래
+    
+    if (audioEnabled) {
+        SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255); // 시아네색 (오디오 켜짐)
+        renderText("AUDIO", x, y, 1);
+        
+        // 볼륨 바
+        int barWidth = 50;
+        int barHeight = 4;
+        int barX = x + 50;
+        int barY = y + 4;
+        
+        // 볼륨 배경
+        drawRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2, 255, 255, 255);
+        drawFilledRect(barX, barY, barWidth, barHeight, 64, 64, 64);
+        
+        // 현재 볼륨
+        int volumeWidth = (barWidth * masterVolume) / 100;
+        if (volumeWidth > 0) {
+            drawFilledRect(barX, barY, volumeWidth, barHeight, 0, 255, 255);
+        }
+        
+        // 볼륨 수치
+        renderNumber(masterVolume, barX + barWidth + 5, y, 1);
+        
+        // 스피커 아이콘
+        SDL_Rect speaker = {x + 30, y + 2, 6, 6};
+        SDL_RenderFillRect(renderer, &speaker);
+        
+        // 음파 표시
+        for (int i = 1; i <= 3; i++) {
+            if (masterVolume > i * 25) {
+                SDL_RenderDrawLine(renderer, x + 37 + i * 2, y + 1, x + 37 + i * 2, y + 8);
+            }
+        }
+        
+    } else {
+        SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); // 회색 (오디오 꺼짐)
+        renderText("NO AUDIO", x, y, 1);
+        
+        // X 표시
+        SDL_RenderDrawLine(renderer, x + 70, y + 2, x + 78, y + 10);
+        SDL_RenderDrawLine(renderer, x + 78, y + 2, x + 70, y + 10);
+    }
+}
+
+void HUD::renderControls() {
+    int x = screenWidth - 200;
+    int y = screenHeight - 120;
+    
+    SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255); // 연한 회색
+    
+    // 컨트롤 가이드
+    renderText("CONTROLS", x, y, 1);
+    renderText("WASD: MOVE", x, y + 15, 1);
+    renderText("ARROWS: TURN", x, y + 25, 1);
+    renderText("F: FLASHLIGHT", x, y + 35, 1);
+    
+    if (audioEnabled) {
+        renderText("+/-: VOLUME", x, y + 45, 1);
     }
     
-    // 설명 텍스트
-    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
-    renderText("F: TOGGLE", x, y + 15, 1);
+    renderText("ESC: EXIT", x, y + 55, 1);
 }
 
 void HUD::renderNumber(int number, int x, int y, int scale) {
@@ -213,7 +293,7 @@ void HUD::renderChar(char c, int x, int y, int scale) {
     // 간단한 5x7 폰트 패턴
     bool pattern[7][5] = {0}; // 기본값은 모두 false
     
-    // 주요 문자들 구현
+    // 주요 문자들 구현 (기존 문자들 + 새로운 문자들)
     if (c == 'H') {
         bool h_pattern[7][5] = {
             {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1}, {1,1,1,1,1},
@@ -298,12 +378,89 @@ void HUD::renderChar(char c, int x, int y, int scale) {
         };
         memcpy(pattern, p_pattern, sizeof(pattern));
     }
+    else if (c == 'I') {
+        bool i_pattern[7][5] = {
+            {1,1,1,1,1}, {0,0,1,0,0}, {0,0,1,0,0}, {0,0,1,0,0},
+            {0,0,1,0,0}, {0,0,1,0,0}, {1,1,1,1,1}
+        };
+        memcpy(pattern, i_pattern, sizeof(pattern));
+    }
+    else if (c == 'G') {
+        bool g_pattern[7][5] = {
+            {0,1,1,1,0}, {1,0,0,0,1}, {1,0,0,0,0}, {1,0,1,1,1},
+            {1,0,0,0,1}, {1,0,0,0,1}, {0,1,1,1,0}
+        };
+        memcpy(pattern, g_pattern, sizeof(pattern));
+    }
+    else if (c == 'N') {
+        bool n_pattern[7][5] = {
+            {1,0,0,0,1}, {1,1,0,0,1}, {1,0,1,0,1}, {1,0,0,1,1},
+            {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1}
+        };
+        memcpy(pattern, n_pattern, sizeof(pattern));
+    }
+    else if (c == 'U') {
+        bool u_pattern[7][5] = {
+            {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1},
+            {1,0,0,0,1}, {1,0,0,0,1}, {0,1,1,1,0}
+        };
+        memcpy(pattern, u_pattern, sizeof(pattern));
+    }
+    else if (c == 'D') {
+        bool d_pattern[7][5] = {
+            {1,1,1,1,0}, {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1},
+            {1,0,0,0,1}, {1,0,0,0,1}, {1,1,1,1,0}
+        };
+        memcpy(pattern, d_pattern, sizeof(pattern));
+    }
+    else if (c == 'V') {
+        bool v_pattern[7][5] = {
+            {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1},
+            {1,0,0,0,1}, {0,1,0,1,0}, {0,0,1,0,0}
+        };
+        memcpy(pattern, v_pattern, sizeof(pattern));
+    }
+    else if (c == 'W') {
+        bool w_pattern[7][5] = {
+            {1,0,0,0,1}, {1,0,0,0,1}, {1,0,0,0,1}, {1,0,1,0,1},
+            {1,0,1,0,1}, {1,1,0,1,1}, {1,0,0,0,1}
+        };
+        memcpy(pattern, w_pattern, sizeof(pattern));
+    }
+    else if (c == 'X') {
+        bool x_pattern[7][5] = {
+            {1,0,0,0,1}, {0,1,0,1,0}, {0,0,1,0,0}, {0,0,1,0,0},
+            {0,0,1,0,0}, {0,1,0,1,0}, {1,0,0,0,1}
+        };
+        memcpy(pattern, x_pattern, sizeof(pattern));
+    }
     else if (c == '/') {
         bool slash_pattern[7][5] = {
             {0,0,0,0,1}, {0,0,0,1,0}, {0,0,1,0,0}, {0,1,0,0,0},
             {1,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}
         };
         memcpy(pattern, slash_pattern, sizeof(pattern));
+    }
+    else if (c == ':') {
+        bool colon_pattern[7][5] = {
+            {0,0,0,0,0}, {0,0,1,0,0}, {0,0,1,0,0}, {0,0,0,0,0},
+            {0,0,1,0,0}, {0,0,1,0,0}, {0,0,0,0,0}
+        };
+        memcpy(pattern, colon_pattern, sizeof(pattern));
+    }
+    else if (c == '+') {
+        bool plus_pattern[7][5] = {
+            {0,0,0,0,0}, {0,0,1,0,0}, {0,0,1,0,0}, {1,1,1,1,1},
+            {0,0,1,0,0}, {0,0,1,0,0}, {0,0,0,0,0}
+        };
+        memcpy(pattern, plus_pattern, sizeof(pattern));
+    }
+    else if (c == '-') {
+        bool minus_pattern[7][5] = {
+            {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}, {1,1,1,1,1},
+            {0,0,0,0,0}, {0,0,0,0,0}, {0,0,0,0,0}
+        };
+        memcpy(pattern, minus_pattern, sizeof(pattern));
     }
     else if (c >= '0' && c <= '9') {
         // 숫자에 대해서는 renderDigit 사용

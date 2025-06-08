@@ -1,18 +1,25 @@
 #include "TextureManager.h"
 #include <iostream>
 #include <cmath>
+#include <SDL_image.h>
 
 TextureManager::TextureManager(SDL_Renderer* sdlRenderer) : renderer(sdlRenderer) {
+    // SDL_image 초기화
+    int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
+    if (!(IMG_Init(imgFlags) & imgFlags)) {
+        std::cerr << "SDL_image could not initialize! IMG_Error: " << IMG_GetError() << std::endl;
+    }
 }
 
 TextureManager::~TextureManager() {
     cleanup();
+    IMG_Quit();
 }
 
 bool TextureManager::loadTexture(const std::string& id, const std::string& filepath) {
-    SDL_Surface* surface = SDL_LoadBMP(filepath.c_str());
+    SDL_Surface* surface = IMG_Load(filepath.c_str());
     if (!surface) {
-        std::cerr << "Failed to load texture: " << filepath << " - " << SDL_GetError() << std::endl;
+        std::cerr << "Failed to load texture: " << filepath << " - " << IMG_GetError() << std::endl;
         return false;
     }
     

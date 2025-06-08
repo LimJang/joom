@@ -15,8 +15,10 @@ private:
     int score;
     float fps;
     
-    // 조명 상태
+    // 시스템 상태
     bool flashlightOn;
+    bool audioEnabled;
+    int masterVolume;
     
 public:
     HUD(SDL_Renderer* sdlRenderer, int width, int height);
@@ -31,6 +33,7 @@ public:
     void setScore(int s) { score = s; }
     void setFPS(float f) { fps = f; }
     void setFlashlightStatus(bool on) { flashlightOn = on; }
+    void setAudioStatus(bool enabled, int volume) { audioEnabled = enabled; masterVolume = volume; }
     
     // 상태 가져오기
     int getHealth() const { return health; }
@@ -45,6 +48,8 @@ private:
     void renderFPS();
     void renderCrosshair();
     void renderFlashlightStatus();
+    void renderAudioStatus();
+    void renderControls();
     
     // 텍스트/숫자 렌더링 (비트맵 폰트 스타일)
     void renderNumber(int number, int x, int y, int scale = 2);

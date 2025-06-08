@@ -6,6 +6,7 @@
 #include "TextureManager.h"
 #include "HUD.h"
 #include "LightSystem.h"
+#include "AudioManager.h"
 
 class Game {
 private:
@@ -18,6 +19,7 @@ private:
     TextureManager* textureManager;
     HUD* hud;
     LightSystem* lightSystem;
+    AudioManager* audioManager;
     
     const int WINDOW_WIDTH = 800;
     const int WINDOW_HEIGHT = 600;
@@ -30,6 +32,10 @@ private:
     // 키 입력 상태 추적
     bool fKeyPressed;
     bool fKeyWasPressed;
+    
+    // 이동 상태 추적 (발자국 소리용)
+    bool isMoving;
+    bool wasMoving;
     
     // 타이밍 관련
     Uint32 lastFrameTime;
@@ -45,4 +51,7 @@ public:
     void render();
     void cleanup();
     void calculateFPS();
+    
+private:
+    void loadCustomSounds(); // 커스텀 사운드 로딩
 };
