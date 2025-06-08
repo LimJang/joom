@@ -85,6 +85,9 @@ public:
     bool isUsingCustomFootsteps() const { return useCustomFootsteps; }
     
 private:
+    // 간단한 사운드 생성 (메모리 안전)
+    Mix_Chunk* generateSimpleSound(int frequency, int duration);
+    
     // 절차적 사운드 생성 함수들
     Mix_Chunk* generateShoeClickSound();
     Mix_Chunk* generateReverbShoeSound();

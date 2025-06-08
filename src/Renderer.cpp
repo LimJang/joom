@@ -94,6 +94,121 @@ void Renderer::render3D(Player* player, Map* map) {
     }
 }
 
+void Renderer::renderItem(const Item& item, Player* player, LightSystem* lightSystem) {
+    if (item.collected) return;
+    
+    float playerX = player->getX();
+    float playerY = player->getY();
+    float playerAngle = player->getAngle();
+    
+    // 아이템과 플레이어 간의 벡터 계산
+    float deltaX = item.x - playerX;
+    float deltaY = item.y - playerY;
+    float distance = sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    // 너무 멀면 렌더링하지 않음
+    if (distance > 8.0f) return;
+    
+    // 아이템 방향 계산
+    float itemAngle = atan2(deltaY, deltaX);
+    float angleDiff = itemAngle - playerAngle;
+    
+    // 각도를 -π ~ π 범위로 정규화
+    while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
+    while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
+    
+    // 시야각 밖이면 렌더링하지 않음
+    float halfFOV = degreesToRadians(FOV / 2);
+    if (abs(angleDiff) > halfFOV) return;
+    
+    // 조명 계산
+    float lighting = lightSystem->calculateLighting(playerX, playerY, playerAngle, item.x, item.y, distance);
+    if (lighting < 0.1f) return; // 너무 어두우면 보이지 않음
+    
+    // 화면상 위치 계산
+    float screenRatio = angleDiff / halfFOV; // -1 ~ 1
+    int screenX = screenWidth / 2 + static_cast<int>(screenRatio * screenWidth / 2);
+    
+    // 아이템 크기 (거리에 따라 변함)
+    int itemSize = static_cast<int>(1000 / distance);  // 기본 크기 증가
+    
+    // 키는 더 크게, 다른 아이템은 기본 크기
+    if (item.type == ItemType::KEY_RED || item.type == ItemType::KEY_BLUE || item.type == ItemType::KEY_YELLOW) {
+        itemSize = static_cast<int>(1200 / distance);  // 키는 20% 더 크게
+    }
+    
+    itemSize = std::max(6, std::min(itemSize, 40)); // 최소 6픽셀, 최대 40픽셀
+    
+    // 화면 중앙에 아이템 그리기
+    int screenY = screenHeight / 2;
+    
+    drawItemSprite(screenX, screenY, itemSize, item.type, lighting, item.animationTime);
+}
+
+void Renderer::drawItemSprite(int screenX, int screenY, int size, ItemType type, float lighting, float animationTime) {
+    // 애니메이션 효과 (위아래 움직임)
+    float bobOffset = sin(animationTime * 3.0f) * 3.0f;
+    screenY += static_cast<int>(bobOffset);
+    
+    // 아이템 색상 가져오기
+    SDL_Color color = getItemColor(type);
+    
+    // 조명 효과 적용
+    Uint8 r = static_cast<Uint8>(color.r * lighting);
+    Uint8 g = static_cast<Uint8>(color.g * lighting);
+    Uint8 b = static_cast<Uint8>(color.b * lighting);
+    
+    // 키 아이템에 대해 특별한 렌더링
+    if (type == ItemType::KEY_RED || type == ItemType::KEY_BLUE || type == ItemType::KEY_YELLOW) {
+        drawKeySprite(screenX, screenY, size, r, g, b);
+    } else {
+        // 기타 아이템은 기존 다이아몬드 모양
+        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+        
+        // 간단한 다이아몬드 모양 그리기
+        SDL_Point points[5];
+        points[0] = {screenX, screenY - size/2};  // 위
+        points[1] = {screenX + size/2, screenY};  // 오른쪽
+        points[2] = {screenX, screenY + size/2};  // 아래
+        points[3] = {screenX - size/2, screenY};  // 왼쪽
+        points[4] = {screenX, screenY - size/2};  // 위 (닫기)
+        
+        // 다이아몬드 외곽선
+        for (int i = 0; i < 4; i++) {
+            SDL_RenderDrawLine(renderer, points[i].x, points[i].y, points[i+1].x, points[i+1].y);
+        }
+        
+        // 중앙에 작은 원형 그리기 (식별용)
+        int centerSize = size / 4;
+        for (int dx = -centerSize; dx <= centerSize; dx++) {
+            for (int dy = -centerSize; dy <= centerSize; dy++) {
+                if (dx*dx + dy*dy <= centerSize*centerSize) {
+                    SDL_RenderDrawPoint(renderer, screenX + dx, screenY + dy);
+                }
+            }
+        }
+    }
+}
+
+SDL_Color Renderer::getItemColor(ItemType type) {
+    switch (type) {
+        case ItemType::KEY_RED:
+            return {255, 80, 80, 255};   // 더 밝은 빨간색
+        case ItemType::KEY_BLUE:
+            return {80, 150, 255, 255};  // 더 밝은 파란색
+        case ItemType::KEY_YELLOW:
+            return {255, 255, 80, 255};  // 더 밝은 노란색
+        case ItemType::HEALTH_PACK:
+            return {100, 255, 100, 255}; // 초록색
+        case ItemType::AMMO_PACK:
+            return {200, 200, 100, 255}; // 황금색
+        case ItemType::EXIT_PORTAL:
+            return {200, 100, 255, 255}; // 보라색
+        default:
+            return {255, 255, 255, 255}; // 흰색
+    }
+}
+
 void Renderer::renderMiniMap(Player* player, Map* map) {
     const int miniMapSize = 150;
     const int miniMapX = screenWidth - miniMapSize - 10;
@@ -117,7 +232,9 @@ void Renderer::renderMiniMap(Player* player, Map* map) {
             
             int tileType = map->getTile(x, y);
             
-            if (tileType != 0) {  // 벽이면
+            if (tileType == 9) {  // 출구
+                SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);  // 마젠타
+            } else if (tileType != 0) {  // 벽이면
                 // 벽 타입에 따른 색상 구분
                 switch (tileType) {
                     case 1: // 벽돌 - 갈색
@@ -243,6 +360,100 @@ void Renderer::drawTexturedVerticalLine(int x, int wallHeight, int wallType, flo
 
 float Renderer::degreesToRadians(float degrees) {
     return degrees * M_PI / 180.0f;
+}
+
+void Renderer::drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 g, Uint8 b) {
+    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    
+    // 키 본체 (직사각형 모양)
+    int keyWidth = size * 3 / 4;
+    int keyHeight = size / 3;
+    
+    // 메인 키 모드 (key head)
+    SDL_Rect keyHead = {
+        screenX - keyWidth/2,
+        screenY - keyHeight/2,
+        keyWidth,
+        keyHeight
+    };
+    
+    // 키 모드 외곽선
+    SDL_RenderDrawRect(renderer, &keyHead);
+    
+    // 키 모드 내부 채우기 (반투명)
+    Uint8 fillR = r / 2;
+    Uint8 fillG = g / 2; 
+    Uint8 fillB = b / 2;
+    SDL_SetRenderDrawColor(renderer, fillR, fillG, fillB, 128);
+    
+    for (int i = 1; i < keyWidth - 1; i++) {
+        for (int j = 1; j < keyHeight - 1; j++) {
+            SDL_RenderDrawPoint(renderer, keyHead.x + i, keyHead.y + j);
+        }
+    }
+    
+    // 키 샤프트 (key shaft)
+    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    int shaftLength = size / 2;
+    int shaftWidth = size / 8;
+    
+    SDL_Rect keyShaft = {
+        screenX - shaftWidth/2,
+        screenY + keyHeight/2,
+        shaftWidth,
+        shaftLength
+    };
+    
+    SDL_RenderFillRect(renderer, &keyShaft);
+    
+    // 키 이빨 (key teeth) - 오른쪽에 작은 이빨들
+    int teethSize = size / 12;
+    
+    // 첫 번째 이빨
+    SDL_Rect tooth1 = {
+        screenX + shaftWidth/2,
+        screenY + keyHeight/2 + shaftLength/3,
+        teethSize,
+        teethSize
+    };
+    SDL_RenderFillRect(renderer, &tooth1);
+    
+    // 두 번째 이빨
+    SDL_Rect tooth2 = {
+        screenX + shaftWidth/2,
+        screenY + keyHeight/2 + 2*shaftLength/3,
+        teethSize * 2,
+        teethSize
+    };
+    SDL_RenderFillRect(renderer, &tooth2);
+    
+    // 키 구멍 (키 모드 중앙에 작은 원)
+    SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255); // 어두운 색
+    int holeRadius = size / 12;
+    
+    for (int dx = -holeRadius; dx <= holeRadius; dx++) {
+        for (int dy = -holeRadius; dy <= holeRadius; dy++) {
+            if (dx*dx + dy*dy <= holeRadius*holeRadius) {
+                SDL_RenderDrawPoint(renderer, screenX + dx, screenY + dy);
+            }
+        }
+    }
+    
+    // 키 반짝임 효과 (상단 에지에 밝은 선)
+    SDL_SetRenderDrawColor(renderer, 
+        std::min(255, static_cast<int>(r * 1.5f)), 
+        std::min(255, static_cast<int>(g * 1.5f)), 
+        std::min(255, static_cast<int>(b * 1.5f)), 255);
+    
+    // 상단 가장자리 밝은 선
+    SDL_RenderDrawLine(renderer, 
+        keyHead.x + 1, keyHead.y + 1,
+        keyHead.x + keyWidth - 2, keyHead.y + 1);
+    
+    // 왼쪽 가장자리 밝은 선
+    SDL_RenderDrawLine(renderer, 
+        keyHead.x + 1, keyHead.y + 1,
+        keyHead.x + 1, keyHead.y + keyHeight - 2);
 }
 
 void Renderer::renderFloorAndCeiling(Player* player, Map* map) {

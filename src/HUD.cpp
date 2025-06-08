@@ -6,7 +6,8 @@
 HUD::HUD(SDL_Renderer* sdlRenderer, int width, int height) 
     : renderer(sdlRenderer), screenWidth(width), screenHeight(height),
       health(100), maxHealth(100), ammo(50), maxAmmo(200), score(0), fps(60.0f), 
-      flashlightOn(true), audioEnabled(true), masterVolume(70) {
+      flashlightOn(true), audioEnabled(true), masterVolume(70),
+      hasRedKey(false), hasBlueKey(false), hasYellowKey(false), currentLevel(1) {
 }
 
 HUD::~HUD() {
@@ -21,7 +22,70 @@ void HUD::render() {
     renderCrosshair();
     renderFlashlightStatus();
     renderAudioStatus();
+    renderKeyStatus();
+    renderLevelInfo();
     renderControls();
+}
+
+void HUD::renderLevelCompleteMessage(int level) {
+    // 화면 중앙에 레벨 완료 메시지 표시
+    int centerX = screenWidth / 2;
+    int centerY = screenHeight / 2;
+    
+    // 반투명 배경
+    drawFilledRect(centerX - 150, centerY - 60, 300, 120, 0, 0, 0, 200);
+    drawRect(centerX - 150, centerY - 60, 300, 120, 255, 255, 0);
+    
+    // 메시지 텍스트
+    SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+    renderText("LEVEL COMPLETE", centerX - 65, centerY - 40, 2);
+    
+    std::string levelText = "LEVEL " + std::to_string(level);
+    renderText(levelText, centerX - 35, centerY - 10, 2);
+    
+    renderText("ADVANCING TO NEXT LEVEL", centerX - 100, centerY + 20, 1);
+}
+
+void HUD::renderKeyStatus() {
+    int x = 20;
+    int y = 80; // 오디오 상태 아래
+    
+    renderText("KEYS", x, y, 1);
+    
+    // 키 아이콘들 그리기
+    drawKeyIcon(x + 35, y, hasRedKey, 255, 100, 100);    // 빨간 키
+    drawKeyIcon(x + 55, y, hasBlueKey, 100, 150, 255);   // 파란 키
+    drawKeyIcon(x + 75, y, hasYellowKey, 255, 255, 100); // 노란 키
+}
+
+void HUD::drawKeyIcon(int x, int y, bool hasKey, Uint8 r, Uint8 g, Uint8 b) {
+    if (hasKey) {
+        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255); // 어두운 회색
+    }
+    
+    // 키 모양 그리기 (간단한 사각형 + 원형)
+    SDL_Rect keyBody = {x, y + 2, 12, 4};
+    SDL_RenderFillRect(renderer, &keyBody);
+    
+    SDL_Rect keyHead = {x + 12, y, 6, 8};
+    SDL_RenderFillRect(renderer, &keyHead);
+    
+    // 키가 있으면 빛나는 효과
+    if (hasKey) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
+        SDL_Rect glow = {x - 1, y - 1, 20, 10};
+        SDL_RenderDrawRect(renderer, &glow);
+    }
+}
+
+void HUD::renderLevelInfo() {
+    int x = screenWidth - 120;
+    int y = 50; // FPS 아래
+    
+    renderText("LEVEL", x, y, 1);
+    renderNumber(currentLevel, x + 40, y, 2);
 }
 
 void HUD::renderHealthBar() {
@@ -194,23 +258,25 @@ void HUD::renderAudioStatus() {
 
 void HUD::renderControls() {
     int x = screenWidth - 200;
-    int y = screenHeight - 120;
+    int y = screenHeight - 140;
     
     SDL_SetRenderDrawColor(renderer, 180, 180, 180, 255); // 연한 회색
     
-    // 컨트롤 가이드
+    // 컨트롤 가이드 (키 수집 게임에 맞게 업데이트)
     renderText("CONTROLS", x, y, 1);
     renderText("WASD: MOVE", x, y + 15, 1);
     renderText("ARROWS: TURN", x, y + 25, 1);
     renderText("F: FLASHLIGHT", x, y + 35, 1);
+    renderText("FIND KEYS TO EXIT", x, y + 45, 1);
     
     if (audioEnabled) {
-        renderText("+/-: VOLUME", x, y + 45, 1);
+        renderText("+/-: VOLUME", x, y + 55, 1);
     }
     
-    renderText("ESC: EXIT", x, y + 55, 1);
+    renderText("ESC: EXIT", x, y + 65, 1);
 }
 
+// 기존의 renderNumber, renderDigit, renderText, renderChar, drawRect, drawFilledRect 함수들은 동일...
 void HUD::renderNumber(int number, int x, int y, int scale) {
     std::string numStr = std::to_string(number);
     
@@ -433,6 +499,20 @@ void HUD::renderChar(char c, int x, int y, int scale) {
             {0,0,1,0,0}, {0,1,0,1,0}, {1,0,0,0,1}
         };
         memcpy(pattern, x_pattern, sizeof(pattern));
+    }
+    else if (c == 'Y') {
+        bool y_pattern[7][5] = {
+            {1,0,0,0,1}, {1,0,0,0,1}, {0,1,0,1,0}, {0,0,1,0,0},
+            {0,0,1,0,0}, {0,0,1,0,0}, {0,0,1,0,0}
+        };
+        memcpy(pattern, y_pattern, sizeof(pattern));
+    }
+    else if (c == 'K') {
+        bool k_pattern[7][5] = {
+            {1,0,0,0,1}, {1,0,0,1,0}, {1,0,1,0,0}, {1,1,0,0,0},
+            {1,0,1,0,0}, {1,0,0,1,0}, {1,0,0,0,1}
+        };
+        memcpy(pattern, k_pattern, sizeof(pattern));
     }
     else if (c == '/') {
         bool slash_pattern[7][5] = {

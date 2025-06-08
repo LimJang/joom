@@ -7,6 +7,7 @@
 #include "HUD.h"
 #include "LightSystem.h"
 #include "AudioManager.h"
+#include "ItemManager.h"
 
 class Game {
 private:
@@ -20,6 +21,7 @@ private:
     HUD* hud;
     LightSystem* lightSystem;
     AudioManager* audioManager;
+    ItemManager* itemManager;
     
     const int WINDOW_WIDTH = 800;
     const int WINDOW_HEIGHT = 600;
@@ -40,6 +42,10 @@ private:
     // 타이밍 관련
     Uint32 lastFrameTime;
     
+    // 게임 상태
+    bool showLevelCompleteMessage;
+    Uint32 levelCompleteTime;
+    
 public:
     Game();
     ~Game();
@@ -54,4 +60,6 @@ public:
     
 private:
     void loadCustomSounds(); // 커스텀 사운드 로딩
+    void checkLevelCompletion();
+    void handleLevelTransition();
 };

@@ -4,6 +4,7 @@
 #include "Map.h"
 #include "TextureManager.h"
 #include "LightSystem.h"
+#include "ItemManager.h"
 
 class Renderer {
 private:
@@ -27,6 +28,7 @@ public:
     void render3D(Player* player, Map* map);
     void renderMiniMap(Player* player, Map* map);
     void renderFloorAndCeiling(Player* player, Map* map);
+    void renderItem(const Item& item, Player* player, LightSystem* lightSystem);
     void clear();
     void present();
     
@@ -34,5 +36,10 @@ private:
     float castRay(float startX, float startY, float angle, Map* map, int& wallType, float& hitX, float& hitY);
     void drawTexturedVerticalLine(int x, int wallHeight, int wallType, float textureX, float lighting);
     void drawVerticalLine(int x, int height, int color);
+    void drawItemSprite(int screenX, int screenY, int size, ItemType type, float lighting, float animationTime);
+    void drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 g, Uint8 b);
     float degreesToRadians(float degrees);
+    
+    // 아이템 색상 반환
+    SDL_Color getItemColor(ItemType type);
 };

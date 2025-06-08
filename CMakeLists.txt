@@ -31,6 +31,7 @@ set(SOURCES
     src/HUD.cpp
     src/LightSystem.cpp
     src/AudioManager.cpp
+    src/ItemManager.cpp
 )
 
 # Create executable
@@ -96,4 +97,10 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
     "${CMAKE_BINARY_DIR}/textures"
     COMMENT "Creating textures directory in build folder"
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+    "${CMAKE_BINARY_DIR}/maps"
+    COMMENT "Creating maps directory in build folder"
 )

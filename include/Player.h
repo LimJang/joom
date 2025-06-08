@@ -16,6 +16,10 @@ public:
     float getY() const { return y; }
     float getAngle() const { return angle; }
     
+    // Setters
+    void setPosition(float newX, float newY) { x = newX; y = newY; }
+    void setAngle(float newAngle) { angle = newAngle; }
+    
     // Movement
     void moveForward(float deltaTime, class Map* map);
     void moveBackward(float deltaTime, class Map* map);
@@ -23,7 +27,6 @@ public:
     void strafeRight(float deltaTime, class Map* map);
     void rotateLeft(float deltaTime);
     void rotateRight(float deltaTime);
-    void setAngle(float newAngle);
     
     // Collision check
     bool canMoveTo(float newX, float newY, class Map* map);

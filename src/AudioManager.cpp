@@ -75,17 +75,48 @@ void AudioManager::cleanup() {
 void AudioManager::generateSounds() {
     if (!initialized) return;
     
-    // 구두 발자국 소리 (또각또각)
-    sounds[SoundType::FOOTSTEP_STONE] = generateShoeClickSound();
+    // 간단한 사운드로 대체 (메모리 안전)
+    sounds[SoundType::FOOTSTEP_STONE] = generateSimpleSound(800, 100);
+    sounds[SoundType::FLASHLIGHT_TOGGLE] = generateSimpleSound(1200, 80);
+    sounds[SoundType::UI_BEEP] = generateSimpleSound(1000, 150);
+    sounds[SoundType::ECHO_FOOTSTEP] = generateSimpleSound(600, 200);
+}
+
+Mix_Chunk* AudioManager::generateSimpleSound(int frequency, int duration) {
+    const int sampleRate = 44100;
+    const int samples = (sampleRate * duration) / 1000;
+    const int bufferSize = samples * 2 * sizeof(Sint16); // 스테레오 16비트
     
-    // 손전등 토글 소리
-    sounds[SoundType::FLASHLIGHT_TOGGLE] = generateFlashlightSound();
+    // SDL_mixer에서 관리할 수 있도록 SDL_malloc 사용
+    Uint8* audioBuffer = (Uint8*)SDL_malloc(bufferSize);
+    if (!audioBuffer) {
+        return nullptr;
+    }
     
-    // UI 비프음
-    sounds[SoundType::UI_BEEP] = generateUIBeepSound();
+    Sint16* sampleBuffer = (Sint16*)audioBuffer;
     
-    // 리버브 구두 소리 (에코 없이 리버브만)
-    sounds[SoundType::ECHO_FOOTSTEP] = generateReverbShoeSound();
+    for (int i = 0; i < samples; i++) {
+        float t = static_cast<float>(i) / sampleRate;
+        float envelope = 1.0f - (t / (duration / 1000.0f)); // 선형 페이드아웃
+        float sample = sin(2.0f * M_PI * frequency * t) * envelope * 0.3f;
+        
+        Sint16 audioSample = static_cast<Sint16>(sample * 32767);
+        sampleBuffer[i * 2] = audioSample;     // 왼쪽 채널
+        sampleBuffer[i * 2 + 1] = audioSample; // 오른쪽 채널
+    }
+    
+    Mix_Chunk* chunk = (Mix_Chunk*)SDL_malloc(sizeof(Mix_Chunk));
+    if (!chunk) {
+        SDL_free(audioBuffer);
+        return nullptr;
+    }
+    
+    chunk->allocated = 1;
+    chunk->abuf = audioBuffer;
+    chunk->alen = bufferSize;
+    chunk->volume = MIX_MAX_VOLUME;
+    
+    return chunk;
 }
 
 bool AudioManager::loadSoundFile(const std::string& filePath, SoundType soundType) {
@@ -214,9 +245,9 @@ void AudioManager::playFootstep() {
             static std::uniform_int_distribution<> dis(0, 1);
             
             if (dis(gen) == 0) {
-                playSound(SoundType::ECHO_FOOTSTEP); // 리버브 구두
+                playSound(SoundType::ECHO_FOOTSTEP);
             } else {
-                playSound(SoundType::FOOTSTEP_STONE); // 일반 구두
+                playSound(SoundType::FOOTSTEP_STONE);
             }
         }
         
@@ -236,7 +267,6 @@ void AudioManager::playCustomFootstep() {
 }
 
 void AudioManager::addCustomFootstepSound(SoundType soundType) {
-    // 중복 체크
     auto it = std::find(customFootstepSounds.begin(), customFootstepSounds.end(), soundType);
     if (it == customFootstepSounds.end()) {
         customFootstepSounds.push_back(soundType);
@@ -266,7 +296,7 @@ void AudioManager::playMusic(const std::string& musicFile) {
     
     backgroundMusic = Mix_LoadMUS(musicFile.c_str());
     if (backgroundMusic) {
-        Mix_PlayMusic(backgroundMusic, -1); // 무한 반복
+        Mix_PlayMusic(backgroundMusic, -1);
     } else {
         std::cerr << "Failed to load music: " << musicFile << " - " << Mix_GetError() << std::endl;
     }
@@ -282,8 +312,6 @@ void AudioManager::stopMusic() {
 
 void AudioManager::setMasterVolume(int volume) {
     masterVolume = std::clamp(volume, 0, 100);
-    
-    // 전체 볼륨 적용
     setSFXVolume(sfxVolume);
     setMusicVolume(musicVolume);
 }
@@ -291,11 +319,9 @@ void AudioManager::setMasterVolume(int volume) {
 void AudioManager::setSFXVolume(int volume) {
     sfxVolume = std::clamp(volume, 0, 100);
     
-    // 마스터 볼륨 적용
     int effectiveVolume = (sfxVolume * masterVolume) / 100;
     int sdlVolume = (effectiveVolume * MIX_MAX_VOLUME) / 100;
     
-    // 모든 사운드 청크에 볼륨 설정
     for (auto& pair : sounds) {
         if (pair.second) {
             Mix_VolumeChunk(pair.second, sdlVolume);
@@ -312,7 +338,6 @@ void AudioManager::setSFXVolume(int volume) {
 void AudioManager::setMusicVolume(int volume) {
     musicVolume = std::clamp(volume, 0, 100);
     
-    // 마스터 볼륨 적용
     int effectiveVolume = (musicVolume * masterVolume) / 100;
     int sdlVolume = (effectiveVolume * MIX_MAX_VOLUME) / 100;
     
@@ -341,231 +366,31 @@ std::string AudioManager::getFileNameWithoutExtension(const std::string& filePat
     return fs::path(filePath).stem().string();
 }
 
-// ===== 절차적 사운드 생성 함수들 (기존 코드 유지) =====
-
+// 호환성을 위한 이전 함수들
 Mix_Chunk* AudioManager::generateShoeClickSound() {
-    const int sampleRate = 44100;
-    const int duration = 120; // 120ms (짧고 깔끔하게)
-    const int samples = (sampleRate * duration) / 1000;
-    
-    Uint16* audioBuffer = new Uint16[samples * 2]; // 스테레오
-    
-    for (int i = 0; i < samples; i++) {
-        float t = static_cast<float>(i) / sampleRate;
-        float sample = 0.0f;
-        
-        // 힐 클릭 (고주파 클릭)
-        float heelClick = sin(2.0f * M_PI * 2800.0f * t) * exp(-t * 40.0f);
-        sample += heelClick * 0.6f;
-        
-        // 가죽 크리즈 (중간 주파수)
-        float leatherCrease = sin(2.0f * M_PI * 800.0f * t) * exp(-t * 25.0f);
-        sample += leatherCrease * 0.3f;
-        
-        // 바닥 임팩트 (저주파)
-        float impact = sin(2.0f * M_PI * 150.0f * t) * exp(-t * 15.0f);
-        sample += impact * 0.4f;
-        
-        // 또각 하모닉 (특징적인 구두 소리)
-        float harmonic = sin(2.0f * M_PI * 1400.0f * t) * exp(-t * 30.0f);
-        sample += harmonic * 0.2f;
-        
-        // 빠른 어택, 빠른 릴리즈 (구두의 특징)
-        float envelope = 1.0f;
-        if (i < samples * 0.02f) {
-            envelope = static_cast<float>(i) / (samples * 0.02f); // 매우 빠른 어택
-        } else {
-            envelope = exp(-t * 12.0f); // 빠른 감쇠
-        }
-        
-        sample *= envelope * 0.7f;
-        
-        // 16비트 변환
-        Sint16 audioSample = static_cast<Sint16>(std::clamp(sample * 32767, -32767.0f, 32767.0f));
-        audioBuffer[i * 2] = audioSample;     // 왼쪽 채널
-        audioBuffer[i * 2 + 1] = audioSample; // 오른쪽 채널
-    }
-    
-    Mix_Chunk* chunk = Mix_QuickLoad_RAW(reinterpret_cast<Uint8*>(audioBuffer), samples * 4);
-    return chunk;
+    return generateSimpleSound(800, 100);
 }
 
 Mix_Chunk* AudioManager::generateFlashlightSound() {
-    const int sampleRate = 44100;
-    const int duration = 120; // 120ms
-    const int samples = (sampleRate * duration) / 1000;
-    
-    Uint16* audioBuffer = new Uint16[samples * 2];
-    
-    for (int i = 0; i < samples; i++) {
-        float t = static_cast<float>(i) / sampleRate;
-        
-        // 클릭 사운드 (높은 주파수에서 낮은 주파수로)
-        float frequency = 1200.0f * (1.0f - t * 3.0f);
-        if (frequency < 300.0f) frequency = 300.0f;
-        
-        float sample = sin(2.0f * M_PI * frequency * t);
-        
-        // 메탈릭 클릭 하모닉 추가
-        sample += sin(2.0f * M_PI * frequency * 2.0f * t) * 0.3f;
-        
-        // 빠른 페이드 아웃
-        float envelope = 1.0f - (t * 5.0f);
-        if (envelope < 0) envelope = 0;
-        
-        sample *= envelope * 0.4f;
-        
-        Sint16 audioSample = static_cast<Sint16>(sample * 32767);
-        audioBuffer[i * 2] = audioSample;
-        audioBuffer[i * 2 + 1] = audioSample;
-    }
-    
-    Mix_Chunk* chunk = Mix_QuickLoad_RAW(reinterpret_cast<Uint8*>(audioBuffer), samples * 4);
-    return chunk;
+    return generateSimpleSound(1200, 80);
 }
 
 Mix_Chunk* AudioManager::generateUIBeepSound() {
-    const int sampleRate = 44100;
-    const int duration = 100; // 100ms
-    const int samples = (sampleRate * duration) / 1000;
-    
-    Uint16* audioBuffer = new Uint16[samples * 2];
-    
-    for (int i = 0; i < samples; i++) {
-        float t = static_cast<float>(i) / sampleRate;
-        
-        // 깔끔한 비프음
-        float sample = sin(2.0f * M_PI * 800.0f * t);
-        
-        // 부드러운 엔벨로프
-        float envelope = sin(M_PI * t / (duration / 1000.0f));
-        
-        sample *= envelope * 0.25f;
-        
-        Sint16 audioSample = static_cast<Sint16>(sample * 32767);
-        audioBuffer[i * 2] = audioSample;
-        audioBuffer[i * 2 + 1] = audioSample;
-    }
-    
-    Mix_Chunk* chunk = Mix_QuickLoad_RAW(reinterpret_cast<Uint8*>(audioBuffer), samples * 4);
-    return chunk;
+    return generateSimpleSound(1000, 150);
 }
 
 Mix_Chunk* AudioManager::generateReverbShoeSound() {
-    const int sampleRate = 44100;
-    const int duration = 2000; // 2초 (강한 리버브)
-    const int samples = (sampleRate * duration) / 1000;
-    
-    Uint16* audioBuffer = new Uint16[samples * 2];
-    
-    // 강한 리버브 파라미터
-    const float reverbDecay = 0.85f;     // 높은 감쇠율 (더 긴 리버브)
-    const float reverbWetness = 0.7f;    // 리버브 강도
-    const int numReflections = 15;       // 많은 반사음
-    const float roomSize = 1.2f;         // 큰 동굴
-    
-    for (int i = 0; i < samples; i++) {
-        float t = static_cast<float>(i) / sampleRate;
-        float sample = 0.0f;
-        
-        // 원본 구두 소리 (첫 120ms)
-        if (i < sampleRate * 0.12f) {
-            float localT = static_cast<float>(i) / (sampleRate * 0.12f);
-            
-            // 힐 클릭 (또각 소리의 핵심)
-            float heelClick = sin(2.0f * M_PI * 2800.0f * localT) * exp(-localT * 40.0f);
-            
-            // 가죽 소리
-            float leather = sin(2.0f * M_PI * 800.0f * localT) * exp(-localT * 25.0f);
-            
-            // 바닥 임팩트
-            float impact = sin(2.0f * M_PI * 150.0f * localT) * exp(-localT * 15.0f);
-            
-            // 하모닉
-            float harmonic = sin(2.0f * M_PI * 1400.0f * localT) * exp(-localT * 30.0f);
-            
-            float drySignal = (heelClick * 0.6f + leather * 0.3f + impact * 0.4f + harmonic * 0.2f);
-            
-            // 빠른 어택
-            float envelope = 1.0f;
-            if (localT < 0.02f) {
-                envelope = localT / 0.02f;
-            } else {
-                envelope = exp(-localT * 12.0f);
-            }
-            
-            sample += drySignal * envelope * 0.5f; // 원본 소리 (드라이)
-        }
-        
-        // 강한 리버브 (다중 반사음)
-        for (int reflection = 1; reflection <= numReflections; reflection++) {
-            float reflectionDelay = reflection * roomSize * 0.05f + 
-                                  sin(reflection * 0.7f) * 0.02f; // 불규칙한 반사
-            int reflectionStartSample = static_cast<int>(reflectionDelay * sampleRate);
-            
-            if (i >= reflectionStartSample) {
-                float reflectionAge = (i - reflectionStartSample) / static_cast<float>(sampleRate);
-                
-                // 반사음 볼륨 (거리에 따라 감쇠)
-                float reflectionVolume = pow(reverbDecay, reflection) * reverbWetness * 
-                                       exp(-reflectionAge * 2.0f);
-                
-                if (reflectionVolume > 0.001f) { // 최소 임계값
-                    // 반사음 생성 (원본의 변형)
-                    float reflectionSample = 0.0f;
-                    
-                    // 고주파 감쇠 (거리감)
-                    float highFreqLoss = pow(0.7f, reflection);
-                    
-                    // 힐 클릭 반사
-                    float reflectedClick = sin(2.0f * M_PI * 2800.0f * highFreqLoss * reflectionAge) * 
-                                         exp(-reflectionAge * 20.0f);
-                    
-                    // 저주파 반사 (동굴 울림)
-                    float reflectedRumble = sin(2.0f * M_PI * 200.0f * reflectionAge) * 
-                                          exp(-reflectionAge * 8.0f);
-                    
-                    reflectionSample = (reflectedClick * 0.4f + reflectedRumble * 0.6f) * 
-                                     reflectionVolume;
-                    
-                    sample += reflectionSample;
-                }
-            }
-        }
-        
-        // 디퓨즈 리버브 테일 (배경 잔향)
-        if (t > 0.15f) {
-            float tailDecay = exp(-(t - 0.15f) * 1.2f);
-            float diffuseReverb = sin(2.0f * M_PI * 300.0f * t + 
-                                    sin(t * 15.0f) * 0.5f) * tailDecay * 0.08f;
-            sample += diffuseReverb;
-        }
-        
-        // 16비트 변환 (클리핑 방지)
-        Sint16 audioSample = static_cast<Sint16>(std::clamp(sample * 32767, -32767.0f, 32767.0f));
-        
-        // 스테레오 처리 (더 넓은 스테레오 필드)
-        float stereoSpread = sin(t * 2.0f * M_PI * 0.4f) * 0.15f;
-        Sint16 leftSample = static_cast<Sint16>(audioSample * (1.0f - stereoSpread));
-        Sint16 rightSample = static_cast<Sint16>(audioSample * (1.0f + stereoSpread));
-        
-        audioBuffer[i * 2] = leftSample;      // 왼쪽 채널
-        audioBuffer[i * 2 + 1] = rightSample; // 오른쪽 채널
-    }
-    
-    Mix_Chunk* chunk = Mix_QuickLoad_RAW(reinterpret_cast<Uint8*>(audioBuffer), samples * 4);
-    return chunk;
+    return generateSimpleSound(600, 200);
 }
 
-// 이전 함수들 (호환성 유지)
 Mix_Chunk* AudioManager::generateFootstepSound() {
-    return generateShoeClickSound();
+    return generateSimpleSound(800, 100);
 }
 
 Mix_Chunk* AudioManager::generateEchoFootstepSound() {
-    return generateReverbShoeSound();
+    return generateSimpleSound(600, 200);
 }
 
 Mix_Chunk* AudioManager::generateReverbFootstepSound() {
-    return generateReverbShoeSound();
+    return generateSimpleSound(600, 200);
 }

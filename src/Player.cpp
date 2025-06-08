@@ -60,10 +60,6 @@ void Player::rotateRight(float deltaTime) {
     if (angle >= 2 * M_PI) angle -= 2 * M_PI;
 }
 
-void Player::setAngle(float newAngle) {
-    angle = newAngle;
-}
-
 bool Player::canMoveTo(float newX, float newY, Map* map) {
     // 경계 체크
     if (newX < 0.2f || newX >= map->getWidth() - 0.2f ||
