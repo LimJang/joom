@@ -457,29 +457,45 @@ void Renderer::drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 
 }
 
 void Renderer::renderFloorAndCeiling(Player* player, Map* map) {
-    // 손전등 상태에 따른 극적인 조명 차이
-    float avgLighting = 0.005f; // 기본적으로 거의 비어보이지 않음
-    
-    if (lightSystem->isFlashlightEnabled()) {
-        // 손전등이 켜져있어도 바닥/천장은 약간만 보임
-        avgLighting = 0.08f;
+    float playerAngle = player->getAngle();
+    float fovRadians = degreesToRadians(FOV);
+
+    // 화면의 각 수평 라인에 대해 반복 (중앙부터 바닥까지)
+    for (int y = screenHeight / 2; y < screenHeight; ++y) {
+        // 현재 y 라인에 대한 실제 세계에서의 거리 계산
+        // (y - screenHeight / 2)가 0이 되는 것을 방지
+        float screenY = y - screenHeight / 2.0f;
+        if (screenY == 0) screenY = 1.0f;
+
+        // 플레이어 높이를 0.5로 가정
+        float distance = (0.5f * screenHeight) / screenY;
+
+        // 거리에 따른 조명 값 가져오기 (LUT 사용)
+        float lighting = 0.0f;
+        if (lightSystem->isFlashlightEnabled()) {
+            lighting = lightSystem->getLightFromDistanceLUT(distance);
+        }
+        
+        // 환경광 추가
+        lighting += lightSystem->getAmbientLight();
+        lighting = std::clamp(lighting, 0.0f, 1.0f);
+
+        // 바닥 색상 결정 (어두운 흙색 계열)
+        Uint8 floorR = static_cast<Uint8>(std::clamp(60 * lighting, 0.0f, 255.0f));
+        Uint8 floorG = static_cast<Uint8>(std::clamp(50 * lighting, 0.0f, 255.0f));
+        Uint8 floorB = static_cast<Uint8>(std::clamp(40 * lighting, 0.0f, 255.0f));
+        
+        // 천장 색상 결정 (매우 어두운 회색 계열)
+        Uint8 ceilR = static_cast<Uint8>(std::clamp(30 * lighting, 0.0f, 255.0f));
+        Uint8 ceilG = static_cast<Uint8>(std::clamp(25 * lighting, 0.0f, 255.0f));
+        Uint8 ceilB = static_cast<Uint8>(std::clamp(20 * lighting, 0.0f, 255.0f));
+
+        // 바닥 라인 그리기
+        SDL_SetRenderDrawColor(renderer, floorR, floorG, floorB, 255);
+        SDL_RenderDrawLine(renderer, 0, y, screenWidth, y);
+
+        // 천장 라인 그리기 (대칭 위치)
+        SDL_SetRenderDrawColor(renderer, ceilR, ceilG, ceilB, 255);
+        SDL_RenderDrawLine(renderer, 0, screenHeight - y, screenWidth, screenHeight - y);
     }
-    
-    // 바닥 렌더링 (매우 어두운 사각형)
-    Uint8 floorR = static_cast<Uint8>(60 * avgLighting);
-    Uint8 floorG = static_cast<Uint8>(50 * avgLighting);
-    Uint8 floorB = static_cast<Uint8>(40 * avgLighting);
-    
-    SDL_SetRenderDrawColor(renderer, floorR, floorG, floorB, 255);
-    SDL_Rect floorRect = {0, screenHeight / 2, screenWidth, screenHeight / 2};
-    SDL_RenderFillRect(renderer, &floorRect);
-    
-    // 천장 렌더링 (완전히 어두운 사각형)
-    Uint8 ceilR = static_cast<Uint8>(30 * avgLighting);
-    Uint8 ceilG = static_cast<Uint8>(25 * avgLighting);
-    Uint8 ceilB = static_cast<Uint8>(20 * avgLighting);
-    
-    SDL_SetRenderDrawColor(renderer, ceilR, ceilG, ceilB, 255);
-    SDL_Rect ceilingRect = {0, 0, screenWidth, screenHeight / 2};
-    SDL_RenderFillRect(renderer, &ceilingRect);
 }

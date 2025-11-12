@@ -1,5 +1,6 @@
 #pragma once
 #include <cmath>
+#include <vector>
 
 class LightSystem {
 private:
@@ -8,6 +9,12 @@ private:
     float flashlightConeAngle;      // 손전등 원뿔각도 (라디안)
     float ambientLight;             // 환경 조명 (최소 밝기)
     bool flashlightEnabled;         // 손전등 켜짐/꺼짐
+
+    // 조명 룩업 테이블 (LUT)
+    std::vector<float> distanceLightingLUT;
+    int lutSize;
+
+    void initializeDistanceLUT();
     
 public:
     LightSystem();
@@ -28,6 +35,9 @@ public:
     
     // 거리 기반 감쇠 계산
     float calculateDistanceAttenuation(float distance) const;
+
+    // 룩업 테이블에서 조명 값 가져오기
+    float getLightFromDistanceLUT(float distance) const;
     
     // Getter 함수들
     bool isFlashlightEnabled() const { return flashlightEnabled; }

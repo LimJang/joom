@@ -7,10 +7,47 @@
 
 LightSystem::LightSystem() 
     : flashlightIntensity(1.2f), flashlightRange(6.0f), 
-      flashlightConeAngle(M_PI / 2.0f), ambientLight(0.05f), flashlightEnabled(true) {
+      flashlightConeAngle(M_PI / 2.0f), ambientLight(0.05f), flashlightEnabled(true),
+      lutSize(256) {
+    initializeDistanceLUT();
 }
 
 LightSystem::~LightSystem() {
+}
+
+void LightSystem::initializeDistanceLUT() {
+    distanceLightingLUT.resize(lutSize);
+    for (int i = 0; i < lutSize; ++i) {
+        // 거리를 0에서 flashlightRange까지 매핑
+        float distance = static_cast<float>(i) / (lutSize - 1) * flashlightRange;
+        
+        // 거리 감쇠만 계산하여 LUT에 저장
+        float attenuation = calculateDistanceAttenuation(distance);
+        
+        // 최종 밝기는 감쇠값과 손전등 강도를 곱한 값
+        distanceLightingLUT[i] = flashlightIntensity * attenuation;
+    }
+}
+
+float LightSystem::getLightFromDistanceLUT(float distance) const {
+    if (distance >= flashlightRange) {
+        return 0.0f;
+    }
+    
+    // 거리를 LUT 인덱스로 변환
+    float lutIndexFloat = (distance / flashlightRange) * (lutSize - 1);
+    int lutIndex = static_cast<int>(lutIndexFloat);
+    
+    // 경계 체크
+    if (lutIndex < 0) return distanceLightingLUT[0];
+    if (lutIndex >= lutSize - 1) return distanceLightingLUT[lutSize - 1];
+    
+    // 선형 보간 (더 부드러운 조명 변화를 위해)
+    float t = lutIndexFloat - lutIndex;
+    float val1 = distanceLightingLUT[lutIndex];
+    float val2 = distanceLightingLUT[lutIndex + 1];
+    
+    return val1 + t * (val2 - val1);
 }
 
 void LightSystem::toggleFlashlight() {
