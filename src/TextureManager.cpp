@@ -1,37 +1,31 @@
 #include "TextureManager.h"
+#include <SDL2/SDL_image.h>
 #include <iostream>
-#include <cmath>
-#include <SDL_image.h>
 
-TextureManager::TextureManager(SDL_Renderer* sdlRenderer) : renderer(sdlRenderer) {
-    // SDL_image 초기화
-    int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
-    if (!(IMG_Init(imgFlags) & imgFlags)) {
-        std::cerr << "SDL_image could not initialize! IMG_Error: " << IMG_GetError() << std::endl;
-    }
-}
+TextureManager::TextureManager(SDL_Renderer* renderer, const std::string& textureDir)
+    : renderer(renderer), textureDirectory(textureDir) {}
 
 TextureManager::~TextureManager() {
-    cleanup();
-    IMG_Quit();
+    for (auto& pair : textures) {
+        if (pair.second) {
+            SDL_DestroyTexture(pair.second);
+        }
+    }
+    textures.clear();
 }
 
-bool TextureManager::loadTexture(const std::string& id, const std::string& filepath) {
-    SDL_Surface* surface = IMG_Load(filepath.c_str());
-    if (!surface) {
-        std::cerr << "Failed to load texture: " << filepath << " - " << IMG_GetError() << std::endl;
+bool TextureManager::loadTexture(const std::string& name, const std::string& filePath) {
+    std::string fullPath = textureDirectory + filePath;
+    SDL_Texture* texture = IMG_LoadTexture(renderer, fullPath.c_str());
+    if (texture == nullptr) {
+        std::cerr << "Failed to load texture: " << fullPath << " - " << IMG_GetError() << std::endl;
         return false;
     }
     
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_FreeSurface(surface);
-    
-    if (!texture) {
-        std::cerr << "Failed to create texture from surface - " << SDL_GetError() << std::endl;
-        return false;
+    if (textures.count(name)) {
+        SDL_DestroyTexture(textures[name]);
     }
-    
-    textures[id] = texture;
+    textures[name] = texture;
     return true;
 }
 

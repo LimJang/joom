@@ -6,12 +6,15 @@
 #include "LightSystem.h"
 #include "ItemManager.h"
 
+class Monster; // 몬스터 클래스 전방 선언
+
 class Renderer {
 private:
     SDL_Renderer* renderer;
     int screenWidth, screenHeight;
     TextureManager* textureManager;
     LightSystem* lightSystem;
+    std::vector<float> depthBuffer;
     
     // 레이캐스팅 설정
     static constexpr float FOV = 60.0f;  // 시야각 (도)
@@ -29,6 +32,7 @@ public:
     void renderMiniMap(Player* player, Map* map);
     void renderFloorAndCeiling(Player* player, Map* map);
     void renderItem(const Item& item, Player* player, LightSystem* lightSystem);
+    void renderMonster(const Monster* monster, Player* player, LightSystem* lightSystem);
     void clear();
     void present();
     
@@ -38,6 +42,7 @@ private:
     void drawVerticalLine(int x, int height, int color);
     void drawItemSprite(int screenX, int screenY, int size, ItemType type, float lighting, float animationTime);
     void drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 g, Uint8 b);
+    void drawMonsterSprite(int screenX, int screenY, int size, float lighting, float animationTime);
     float degreesToRadians(float degrees);
     
     // 아이템 색상 반환

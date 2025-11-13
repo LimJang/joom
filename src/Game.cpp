@@ -6,7 +6,8 @@
 Game::Game() : window(nullptr), renderer(nullptr), running(false), 
                player(nullptr), map(nullptr), gameRenderer(nullptr),
                textureManager(nullptr), hud(nullptr), lightSystem(nullptr),
-               audioManager(nullptr), itemManager(nullptr), frameCount(0), fpsTimer(0), currentFPS(60.0f),
+               audioManager(nullptr), itemManager(nullptr), monster(nullptr), pathfinder(nullptr),
+               frameCount(0), fpsTimer(0), currentFPS(60.0f),
                fKeyPressed(false), fKeyWasPressed(false), 
                isMoving(false), wasMoving(false), lastFrameTime(0),
                showLevelCompleteMessage(false), levelCompleteTime(0) {
@@ -16,7 +17,7 @@ Game::~Game() {
     cleanup();
 }
 
-bool Game::initialize() {
+bool Game::initialize(const std::string& resourcePath) {
     // SDL 초기화
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
@@ -49,11 +50,11 @@ bool Game::initialize() {
     if (!audioManager->initialize()) {
         std::cerr << "Audio system failed to initialize, continuing without sound..." << std::endl;
     } else {
-        loadCustomSounds();
+        loadCustomSounds(resourcePath);
     }
     
     // 게임 객체들 초기화
-    map = new Map();
+    map = new Map(resourcePath + "maps/");
     itemManager = new ItemManager();
     
     // 레벨 1에 맞는 안전한 시작 위치 찾기
@@ -77,10 +78,14 @@ bool Game::initialize() {
     }
     
     player = new Player(startX, startY, 0.0f);  // 안전한 위치에서 시작
-    textureManager = new TextureManager(renderer);
+    textureManager = new TextureManager(renderer, resourcePath + "textures/");
     lightSystem = new LightSystem();
     gameRenderer = new Renderer(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, textureManager, lightSystem);
     hud = new HUD(renderer, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    // 경로 탐색기 및 몬스터 초기화
+    pathfinder = new Pathfinder();
+    monster = new Monster(10.5f, 5.5f); // 레벨 1의 특정 위치에 몬스터 생성
     
     // 텍스처 초기화
     gameRenderer->initializeTextures();
@@ -98,31 +103,13 @@ bool Game::initialize() {
     if (audioManager && audioManager->isInitialized()) {
         audioManager->playSound(SoundType::UI_BEEP);
         
-        // 엠비언트 사운드 시작 (ambient1 파일이 있으면 재생, 없으면 기본 사운드)
-        if (audioManager->isSoundLoaded("ambient1")) {
-            audioManager->playMusic("sounds/ambient1.wav"); // 무한 반복
-            std::cout << "🎵 Ambient sound started: ambient1" << std::endl;
+        // 엠비언트 사운드 시작
+        std::string ambientPath = resourcePath + "sounds/ambient1.wav";
+        if (std::filesystem::exists(ambientPath)) {
+            audioManager->playMusic(ambientPath);
+            std::cout << "🎵 Ambient sound started: " << ambientPath << std::endl;
         } else {
-            // ambient1 파일이 없어도 다른 형식들 시도
-            std::vector<std::string> ambientFiles = {
-                "sounds/ambient1.mp3",
-                "sounds/ambient1.ogg", 
-                "sounds/ambient1.flac"
-            };
-            
-            bool ambientStarted = false;
-            for (const std::string& file : ambientFiles) {
-                if (std::filesystem::exists(file)) {
-                    audioManager->playMusic(file);
-                    std::cout << "🎵 Ambient sound started: " << file << std::endl;
-                    ambientStarted = true;
-                    break;
-                }
-            }
-            
-            if (!ambientStarted) {
-                std::cout << "⚠️  No ambient1 file found - place ambient1.wav/mp3/ogg in sounds/ folder for background atmosphere" << std::endl;
-            }
+            std::cout << "⚠️  No ambient1.wav file found in " << resourcePath + "sounds/" << std::endl;
         }
     }
     
@@ -132,27 +119,12 @@ bool Game::initialize() {
     return true;
 }
 
-void Game::loadCustomSounds() {
+void Game::loadCustomSounds(const std::string& resourcePath) {
     if (!audioManager || !audioManager->isInitialized()) return;
     
     // sounds 폴더에서 모든 사운드 파일 로드
-    std::string soundsPath = "sounds";
+    std::string soundsPath = resourcePath + "sounds/";
     audioManager->loadSoundsFromDirectory(soundsPath);
-    
-    // 개별 파일 로딩 시도
-    if (audioManager->loadSoundFile("sounds/footstep1.wav", SoundType::CUSTOM_FOOTSTEP_1)) {
-        audioManager->addCustomFootstepSound(SoundType::CUSTOM_FOOTSTEP_1);
-    }
-    
-    if (audioManager->loadSoundFile("sounds/footstep2.wav", SoundType::CUSTOM_FOOTSTEP_2)) {
-        audioManager->addCustomFootstepSound(SoundType::CUSTOM_FOOTSTEP_2);
-    }
-    
-    // 커스텀 발자국이 있으면 활성화
-    if (audioManager->isSoundLoaded(SoundType::CUSTOM_FOOTSTEP_1) || 
-        audioManager->isSoundLoaded(SoundType::CUSTOM_FOOTSTEP_2)) {
-        audioManager->enableCustomFootsteps(true);
-    }
 }
 
 void Game::run() {
@@ -273,6 +245,23 @@ void Game::handleEvents(float deltaTime) {
 }
 
 void Game::update(float deltaTime) {
+    // 몬스터 업데이트
+    if (monster && pathfinder) {
+        monster->update(player, map, pathfinder, audioManager, deltaTime);
+    }
+
+    // 몬스터와 플레이어 충돌 검사
+    if (monster) {
+        float dx = player->getX() - monster->getX();
+        float dy = player->getY() - monster->getY();
+        float distance = sqrt(dx * dx + dy * dy);
+
+        if (distance < 0.8f) { // 충돌 반경 증가
+            std::cout << "Player collided with the monster! Game Over." << std::endl;
+            running = false; // 게임 루프를 정상적으로 종료
+        }
+    }
+
     // 아이템 시스템 업데이트
     itemManager->update(deltaTime);
     
@@ -413,6 +402,11 @@ void Game::render() {
             gameRenderer->renderItem(item, player, lightSystem);
         }
     }
+
+    // 몬스터 렌더링
+    if (monster) {
+        gameRenderer->renderMonster(monster, player, lightSystem);
+    }
     
     gameRenderer->renderMiniMap(player, map);
     hud->render();
@@ -426,6 +420,8 @@ void Game::render() {
 }
 
 void Game::cleanup() {
+    delete monster;
+    delete pathfinder;
     delete itemManager;
     delete hud;
     delete gameRenderer;

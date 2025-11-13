@@ -70,7 +70,52 @@ void AudioManager::cleanup() {
     // SDL_mixer 종료
     Mix_CloseAudio();
     initialized = false;
+    positionalSoundChannels.clear();
 }
+
+void AudioManager::updatePositionalSound(const std::string& soundName, float distance, float maxDistance) {
+    if (!initialized || namedSounds.find(soundName) == namedSounds.end()) {
+        return;
+    }
+
+    auto it = positionalSoundChannels.find(soundName);
+
+    if (distance < maxDistance) {
+        int channel = -1;
+        if (it == positionalSoundChannels.end()) {
+            // 사운드 재생 시작
+            channel = Mix_PlayChannel(-1, namedSounds[soundName], -1); // -1: 무한 반복
+            if (channel != -1) {
+                positionalSoundChannels[soundName] = channel;
+            }
+        } else {
+            channel = it->second;
+        }
+
+        if (channel != -1) {
+            // 거리에 따른 볼륨 계산 (선형 감쇠)
+            float volumeRatio = 1.0f - (distance / maxDistance);
+            int volume = static_cast<int>(MIX_MAX_VOLUME * std::clamp(volumeRatio, 0.0f, 1.0f));
+            Mix_Volume(channel, volume);
+        }
+    } else {
+        // 거리를 벗어났으면 사운드 정지
+        if (it != positionalSoundChannels.end()) {
+            stopPositionalSound(soundName);
+        }
+    }
+}
+
+void AudioManager::stopPositionalSound(const std::string& soundName) {
+    if (!initialized) return;
+
+    auto it = positionalSoundChannels.find(soundName);
+    if (it != positionalSoundChannels.end()) {
+        Mix_HaltChannel(it->second);
+        positionalSoundChannels.erase(it);
+    }
+}
+
 
 void AudioManager::generateSounds() {
     if (!initialized) return;
@@ -393,4 +438,8 @@ Mix_Chunk* AudioManager::generateEchoFootstepSound() {
 
 Mix_Chunk* AudioManager::generateReverbFootstepSound() {
     return generateSimpleSound(600, 200);
+}
+
+int AudioManager::getMasterVolume() const {
+    return masterVolume;
 }

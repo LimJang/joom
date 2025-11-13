@@ -32,10 +32,20 @@ set(SOURCES
     src/LightSystem.cpp
     src/AudioManager.cpp
     src/ItemManager.cpp
+    src/Monster.cpp
+    src/Pathfinder.cpp
 )
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+# macOS specific settings for creating an app bundle
+if(APPLE)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        MACOSX_BUNDLE ON
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in
+    )
+endif()
 
 # Link libraries
 if(APPLE)

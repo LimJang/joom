@@ -8,6 +8,7 @@
 
 Renderer::Renderer(SDL_Renderer* sdlRenderer, int width, int height, TextureManager* texMgr, LightSystem* lights)
     : renderer(sdlRenderer), screenWidth(width), screenHeight(height), textureManager(texMgr), lightSystem(lights) {
+    depthBuffer.resize(screenWidth);
 }
 
 Renderer::~Renderer() {
@@ -15,9 +16,9 @@ Renderer::~Renderer() {
 
 void Renderer::initializeTextures() {
     // 각 텍스처를 개별적으로 로딩 시도
-    bool brick_loaded = textureManager->loadTexture("wall_brick", "textures/wall_brick.png");
-    bool stone_loaded = textureManager->loadTexture("wall_stone", "textures/wall_stone.png");
-    bool metal_loaded = textureManager->loadTexture("wall_metal", "textures/wall_metal.png");
+    bool brick_loaded = textureManager->loadTexture("wall_brick", "wall_brick.png");
+    bool stone_loaded = textureManager->loadTexture("wall_stone", "wall_stone.png");
+    bool metal_loaded = textureManager->loadTexture("wall_metal", "wall_metal.png");
     
     // 실패한 텍스처만 프로시저럴로 생성
     if (!brick_loaded) {
@@ -47,6 +48,9 @@ void Renderer::render3D(Player* player, Map* map) {
     float playerY = player->getY();
     float playerAngle = player->getAngle();
     
+    // 뎁스 버퍼 초기화
+    std::fill(depthBuffer.begin(), depthBuffer.end(), MAX_DISTANCE);
+
     // 손전등이 꺼져있으면 완전 암흑
     if (!lightSystem->isFlashlightEnabled()) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -73,6 +77,9 @@ void Renderer::render3D(Player* player, Map* map) {
         float hitX, hitY;
         float distance = castRay(playerX, playerY, rayAngle, map, wallType, hitX, hitY);
         
+        // 뎁스 버퍼에 거리 기록
+        depthBuffer[x] = distance;
+
         // 거리에 따른 벽 높이 계산
         float wallHeight = (screenHeight / distance) * 0.6f;
         
@@ -101,93 +108,63 @@ void Renderer::renderItem(const Item& item, Player* player, LightSystem* lightSy
     float playerY = player->getY();
     float playerAngle = player->getAngle();
     
-    // 아이템과 플레이어 간의 벡터 계산
     float deltaX = item.x - playerX;
     float deltaY = item.y - playerY;
     float distance = sqrt(deltaX * deltaX + deltaY * deltaY);
     
-    // 너무 멀면 렌더링하지 않음
-    if (distance > 8.0f) return;
+    if (distance > 15.0f) return;
     
-    // 아이템 방향 계산
     float itemAngle = atan2(deltaY, deltaX);
     float angleDiff = itemAngle - playerAngle;
     
-    // 각도를 -π ~ π 범위로 정규화
     while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
     while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
     
-    // 시야각 밖이면 렌더링하지 않음
     float halfFOV = degreesToRadians(FOV / 2);
     if (abs(angleDiff) > halfFOV) return;
     
-    // 조명 계산
     float lighting = lightSystem->calculateLighting(playerX, playerY, playerAngle, item.x, item.y, distance);
-    if (lighting < 0.1f) return; // 너무 어두우면 보이지 않음
+    if (lighting < 0.1f) return;
     
-    // 화면상 위치 계산
-    float screenRatio = angleDiff / halfFOV; // -1 ~ 1
+    float screenRatio = angleDiff / halfFOV;
     int screenX = screenWidth / 2 + static_cast<int>(screenRatio * screenWidth / 2);
     
-    // 아이템 크기 (거리에 따라 변함)
-    int itemSize = static_cast<int>(1000 / distance);  // 기본 크기 증가
-    
-    // 키는 더 크게, 다른 아이템은 기본 크기
+    int itemSize = static_cast<int>(1000 / distance);
     if (item.type == ItemType::KEY_RED || item.type == ItemType::KEY_BLUE || item.type == ItemType::KEY_YELLOW) {
-        itemSize = static_cast<int>(1200 / distance);  // 키는 20% 더 크게
+        itemSize = static_cast<int>(1200 / distance);
     }
+    itemSize = std::max(6, std::min(itemSize, 40));
     
-    itemSize = std::max(6, std::min(itemSize, 40)); // 최소 6픽셀, 최대 40픽셀
-    
-    // 화면 중앙에 아이템 그리기
     int screenY = screenHeight / 2;
     
-    drawItemSprite(screenX, screenY, itemSize, item.type, lighting, item.animationTime);
+    // 뎁스 체크하며 아이템 그리기
+    int itemWidth = itemSize;
+    for (int x = screenX - itemWidth / 2; x < screenX + itemWidth / 2; ++x) {
+        if (x >= 0 && x < screenWidth && distance < depthBuffer[x]) {
+            // drawItemSprite는 이제 한 줄만 그리도록 수정되어야 함
+            drawItemSprite(x, screenY, itemSize, item.type, lighting, item.animationTime);
+        }
+    }
 }
 
 void Renderer::drawItemSprite(int screenX, int screenY, int size, ItemType type, float lighting, float animationTime) {
-    // 애니메이션 효과 (위아래 움직임)
+    // 이 함수는 이제 한 줄만 그림
     float bobOffset = sin(animationTime * 3.0f) * 3.0f;
     screenY += static_cast<int>(bobOffset);
     
-    // 아이템 색상 가져오기
     SDL_Color color = getItemColor(type);
     
-    // 조명 효과 적용
     Uint8 r = static_cast<Uint8>(color.r * lighting);
     Uint8 g = static_cast<Uint8>(color.g * lighting);
     Uint8 b = static_cast<Uint8>(color.b * lighting);
     
-    // 키 아이템에 대해 특별한 렌더링
-    if (type == ItemType::KEY_RED || type == ItemType::KEY_BLUE || type == ItemType::KEY_YELLOW) {
-        drawKeySprite(screenX, screenY, size, r, g, b);
-    } else {
-        // 기타 아이템은 기존 다이아몬드 모양
-        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-        
-        // 간단한 다이아몬드 모양 그리기
-        SDL_Point points[5];
-        points[0] = {screenX, screenY - size/2};  // 위
-        points[1] = {screenX + size/2, screenY};  // 오른쪽
-        points[2] = {screenX, screenY + size/2};  // 아래
-        points[3] = {screenX - size/2, screenY};  // 왼쪽
-        points[4] = {screenX, screenY - size/2};  // 위 (닫기)
-        
-        // 다이아몬드 외곽선
-        for (int i = 0; i < 4; i++) {
-            SDL_RenderDrawLine(renderer, points[i].x, points[i].y, points[i+1].x, points[i+1].y);
-        }
-        
-        // 중앙에 작은 원형 그리기 (식별용)
-        int centerSize = size / 4;
-        for (int dx = -centerSize; dx <= centerSize; dx++) {
-            for (int dy = -centerSize; dy <= centerSize; dy++) {
-                if (dx*dx + dy*dy <= centerSize*centerSize) {
-                    SDL_RenderDrawPoint(renderer, screenX + dx, screenY + dy);
-                }
-            }
-        }
-    }
+    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    
+    int startY = screenY - size / 2;
+    int endY = screenY + size / 2;
+    
+    // 아이템 타입에 따라 다른 모양을 그릴 수 있지만, 여기서는 간단히 수직선만 그림
+    SDL_RenderDrawLine(renderer, screenX, startY, screenX, endY);
 }
 
 SDL_Color Renderer::getItemColor(ItemType type) {
@@ -454,6 +431,116 @@ void Renderer::drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 
     SDL_RenderDrawLine(renderer, 
         keyHead.x + 1, keyHead.y + 1,
         keyHead.x + 1, keyHead.y + keyHeight - 2);
+}
+
+#include "Monster.h"
+
+void Renderer::renderMonster(const Monster* monster, Player* player, LightSystem* lightSystem) {
+    float playerX = player->getX();
+    float playerY = player->getY();
+    float playerAngle = player->getAngle();
+
+    float monsterX = monster->getX();
+    float monsterY = monster->getY();
+
+    float deltaX = monsterX - playerX;
+    float deltaY = monsterY - playerY;
+    float distance = sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    if (distance > 15.0f) return;
+
+    float monsterAngle = atan2(deltaY, deltaX);
+    float angleDiff = monsterAngle - playerAngle;
+
+    while (angleDiff > M_PI) angleDiff -= 2 * M_PI;
+    while (angleDiff < -M_PI) angleDiff += 2 * M_PI;
+
+    float halfFOV = degreesToRadians(FOV / 2);
+    if (abs(angleDiff) > halfFOV) return;
+
+    float lighting = lightSystem->calculateLighting(playerX, playerY, playerAngle, monsterX, monsterY, distance);
+    if (lighting < 0.1f) return;
+
+    float screenRatio = angleDiff / halfFOV;
+    int screenX = screenWidth / 2 + static_cast<int>(screenRatio * screenWidth / 2);
+
+    int monsterSize = static_cast<int>(screenHeight / distance * 0.8f);
+    monsterSize = std::max(10, std::min(monsterSize, 350)); // 최대 크기 증가
+
+    int screenY = screenHeight / 2 + static_cast<int>(monsterSize * 0.25f);
+
+    // 뎁스 체크하며 몬스터 그리기
+    int monsterWidth = monsterSize;
+    for (int x = screenX - monsterWidth / 2; x < screenX + monsterWidth / 2; ++x) {
+        if (x >= 0 && x < screenWidth && distance < depthBuffer[x]) {
+            // drawMonsterSprite는 이제 전체 스프라이트를 그림
+        }
+    }
+    // 뎁스 체크는 전체 스프라이트에 대해 한 번만 수행
+    if (distance < depthBuffer[screenX]) {
+        drawMonsterSprite(screenX, screenY, monsterSize, lighting, monster->getAnimationTime());
+    }
+}
+
+void Renderer::drawMonsterSprite(int screenX, int screenY, int size, float lighting, float animationTime) {
+    // 애니메이션
+    float bobbing = sin(animationTime * 2.0f) * (size * 0.05f);
+    screenY += static_cast<int>(bobbing);
+
+    // 몸체
+    SDL_Color bodyColor = {50, 50, 60, 255}; // 어두운 금속색
+    Uint8 bodyR = static_cast<Uint8>(bodyColor.r * lighting);
+    Uint8 bodyG = static_cast<Uint8>(bodyColor.g * lighting);
+    Uint8 bodyB = static_cast<Uint8>(bodyColor.b * lighting);
+    SDL_SetRenderDrawColor(renderer, bodyR, bodyG, bodyB, 255);
+    SDL_Rect bodyRect = {
+        screenX - size / 4,
+        screenY - size / 2,
+        size / 2,
+        size
+    };
+    SDL_RenderFillRect(renderer, &bodyRect);
+
+    // 날개 애니메이션
+    float wingFlap = sin(animationTime * 4.0f) * (size * 0.1f);
+
+    // 왼쪽 날개
+    SDL_Color wingColor = {80, 80, 90, 255}; // 몸체보다 밝은 금속색
+    Uint8 wingR = static_cast<Uint8>(wingColor.r * lighting);
+    Uint8 wingG = static_cast<Uint8>(wingColor.g * lighting);
+    Uint8 wingB = static_cast<Uint8>(wingColor.b * lighting);
+    SDL_SetRenderDrawColor(renderer, wingR, wingG, wingB, 255);
+    SDL_Rect leftWingRect = {
+        screenX - size / 2,
+        screenY - size / 3 + static_cast<int>(wingFlap),
+        size / 4,
+        size / 2
+    };
+    SDL_RenderFillRect(renderer, &leftWingRect);
+
+    // 오른쪽 날개
+    SDL_Rect rightWingRect = {
+        screenX + size / 4,
+        screenY - size / 3 - static_cast<int>(wingFlap),
+        size / 4,
+        size / 2
+    };
+    SDL_RenderFillRect(renderer, &rightWingRect);
+
+    // 중앙 코어(눈)
+    float coreGlow = (sin(animationTime * 3.0f) + 1.0f) / 2.0f; // 0.0 ~ 1.0
+    SDL_Color coreColor = {255, 50, 50, 255}; // 밝은 붉은색
+    Uint8 coreR = static_cast<Uint8>(coreColor.r * lighting);
+    Uint8 coreG = static_cast<Uint8>(coreColor.g * lighting * coreGlow);
+    Uint8 coreB = static_cast<Uint8>(coreColor.b * lighting * coreGlow);
+    SDL_SetRenderDrawColor(renderer, coreR, coreG, coreB, 255);
+    SDL_Rect coreRect = {
+        screenX - size / 8,
+        screenY - size / 8,
+        size / 4,
+        size / 4
+    };
+    SDL_RenderFillRect(renderer, &coreRect);
 }
 
 void Renderer::renderFloorAndCeiling(Player* player, Map* map) {

@@ -8,6 +8,8 @@
 #include "LightSystem.h"
 #include "AudioManager.h"
 #include "ItemManager.h"
+#include "Monster.h"
+#include "Pathfinder.h"
 
 class Game {
 private:
@@ -22,6 +24,8 @@ private:
     LightSystem* lightSystem;
     AudioManager* audioManager;
     ItemManager* itemManager;
+    Monster* monster;
+    Pathfinder* pathfinder;
     
     const int WINDOW_WIDTH = 800;
     const int WINDOW_HEIGHT = 600;
@@ -50,7 +54,7 @@ public:
     Game();
     ~Game();
     
-    bool initialize();
+    bool initialize(const std::string& resourcePath);
     void run();
     void handleEvents(float deltaTime);
     void update(float deltaTime);
@@ -59,7 +63,7 @@ public:
     void calculateFPS();
     
 private:
-    void loadCustomSounds(); // 커스텀 사운드 로딩
+    void loadCustomSounds(const std::string& resourcePath); // 커스텀 사운드 로딩
     void checkLevelCompletion();
     void handleLevelTransition();
 };

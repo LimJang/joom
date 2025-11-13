@@ -4,7 +4,7 @@
 #include <iostream>
 #include <filesystem>
 
-Map::Map() : width(16), height(16), tileSize(64), currentLevel(1), mapDirectory("maps") {
+Map::Map(const std::string& mapDir) : width(16), height(16), tileSize(64), mapDirectory(mapDir), currentLevel(1) {
     createMapDirectory();
     createDefaultMapFiles();
     loadLevel(1);
