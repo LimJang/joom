@@ -5,9 +5,9 @@
 
 HUD::HUD(SDL_Renderer* sdlRenderer, int width, int height) 
     : renderer(sdlRenderer), screenWidth(width), screenHeight(height),
-      health(100), maxHealth(100), ammo(50), maxAmmo(200), score(0), fps(60.0f), 
+      health(100), maxHealth(100), ammo(50), maxAmmo(200), fps(60.0f), 
       flashlightOn(true), audioEnabled(true), masterVolume(70),
-      hasRedKey(false), hasBlueKey(false), hasYellowKey(false), currentLevel(1) {
+      hasRedKey(false), hasBlueKey(false), hasYellowKey(false) {
 }
 
 HUD::~HUD() {
@@ -17,13 +17,11 @@ void HUD::render() {
     // HUD 요소들 렌더링
     renderHealthBar();
     renderAmmoCounter();
-    renderScore();
     renderFPS();
     renderCrosshair();
     renderFlashlightStatus();
     renderAudioStatus();
     renderKeyStatus();
-    renderLevelInfo();
     renderControls();
 }
 
@@ -80,14 +78,6 @@ void HUD::drawKeyIcon(int x, int y, bool hasKey, Uint8 r, Uint8 g, Uint8 b) {
     }
 }
 
-void HUD::renderLevelInfo() {
-    int x = screenWidth - 120;
-    int y = 50; // FPS 아래
-    
-    renderText("LEVEL", x, y, 1);
-    renderNumber(currentLevel, x + 40, y, 2);
-}
-
 void HUD::renderHealthBar() {
     int barWidth = 200;
     int barHeight = 20;
@@ -131,14 +121,6 @@ void HUD::renderAmmoCounter() {
     
     // 최대 탄약
     renderNumber(maxAmmo, x + 80, y + 5, 1);
-}
-
-void HUD::renderScore() {
-    int x = (screenWidth - 100) / 2;
-    int y = 20;
-    
-    renderText("SCORE", x, y);
-    renderNumber(score, x, y + 20, 2);
 }
 
 void HUD::renderFPS() {

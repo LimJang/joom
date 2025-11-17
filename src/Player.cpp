@@ -61,12 +61,6 @@ void Player::rotateRight(float deltaTime) {
 }
 
 bool Player::canMoveTo(float newX, float newY, Map* map) {
-    // 경계 체크
-    if (newX < 0.2f || newX >= map->getWidth() - 0.2f ||
-        newY < 0.2f || newY >= map->getHeight() - 0.2f) {
-        return false;
-    }
-    
     // 벽 충돌 체크
     return !map->isWallAt(newX, newY);
 }

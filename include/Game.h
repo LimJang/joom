@@ -45,10 +45,6 @@ private:
     // 타이밍 관련
     Uint32 lastFrameTime;
     
-    // 게임 상태
-    bool showLevelCompleteMessage;
-    Uint32 levelCompleteTime;
-    
 public:
     Game();
     ~Game();
@@ -63,6 +59,4 @@ public:
     
 private:
     void loadCustomSounds(const std::string& resourcePath); // 커스텀 사운드 로딩
-    void checkLevelCompletion();
-    void handleLevelTransition();
 };

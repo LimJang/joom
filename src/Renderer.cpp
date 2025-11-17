@@ -254,7 +254,7 @@ void Renderer::renderMiniMap(Player* player, Map* map) {
     for (int y = 0; y < map->getHeight(); y++) {
         for (int x = 0; x < map->getWidth(); x++) {
             SDL_Rect tileRect = { miniMapX + x * tileSize, miniMapY + y * tileSize, tileSize, tileSize };
-            int tileType = map->getTile(x, y);
+            int tileType = map->getWallType(x, y);
             
             if (tileType == 9) {
                 SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);

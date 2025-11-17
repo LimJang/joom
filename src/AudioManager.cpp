@@ -36,8 +36,6 @@ bool AudioManager::initialize() {
     
     // 볼륨 설정 적용
     setMasterVolume(masterVolume);
-    setSFXVolume(sfxVolume);
-    setMusicVolume(musicVolume);
     
     return true;
 }
@@ -296,24 +294,6 @@ void AudioManager::playFootstep() {
     }
 }
 
-void AudioManager::playCustomFootstep() {
-    if (customFootstepSounds.empty()) return;
-    
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, customFootstepSounds.size() - 1);
-    
-    SoundType selectedSound = customFootstepSounds[dis(gen)];
-    playSound(selectedSound);
-}
-
-void AudioManager::addCustomFootstepSound(SoundType soundType) {
-    auto it = std::find(customFootstepSounds.begin(), customFootstepSounds.end(), soundType);
-    if (it == customFootstepSounds.end()) {
-        customFootstepSounds.push_back(soundType);
-    }
-}
-
 std::vector<std::string> AudioManager::getLoadedSoundNames() const {
     std::vector<std::string> names;
     for (const auto& pair : namedSounds) {
@@ -351,8 +331,18 @@ void AudioManager::stopMusic() {
     }
 }
 
+void AudioManager::increaseMasterVolume() {
+    setMasterVolume(masterVolume + 5);
+}
+
+void AudioManager::decreaseMasterVolume() {
+    setMasterVolume(masterVolume - 5);
+}
+
 void AudioManager::setMasterVolume(int volume) {
     masterVolume = std::clamp(volume, 0, 100);
+    std::cout << "Master Volume set to " << masterVolume << "%" << std::endl;
+    // Apply master volume to SFX and Music
     setSFXVolume(sfxVolume);
     setMusicVolume(musicVolume);
 }
@@ -363,12 +353,12 @@ void AudioManager::setSFXVolume(int volume) {
     int effectiveVolume = (sfxVolume * masterVolume) / 100;
     int sdlVolume = (effectiveVolume * MIX_MAX_VOLUME) / 100;
     
+    // Set volume for all chunks (sound effects)
     for (auto& pair : sounds) {
         if (pair.second) {
             Mix_VolumeChunk(pair.second, sdlVolume);
         }
     }
-    
     for (auto& pair : namedSounds) {
         if (pair.second) {
             Mix_VolumeChunk(pair.second, sdlVolume);
@@ -383,6 +373,10 @@ void AudioManager::setMusicVolume(int volume) {
     int sdlVolume = (effectiveVolume * MIX_MAX_VOLUME) / 100;
     
     Mix_VolumeMusic(sdlVolume);
+}
+
+int AudioManager::getMasterVolume() const {
+    return masterVolume;
 }
 
 // ===== 유틸리티 함수들 =====
@@ -408,34 +402,10 @@ std::string AudioManager::getFileNameWithoutExtension(const std::string& filePat
 }
 
 // 호환성을 위한 이전 함수들
-Mix_Chunk* AudioManager::generateShoeClickSound() {
-    return generateSimpleSound(800, 100);
-}
-
-Mix_Chunk* AudioManager::generateFlashlightSound() {
-    return generateSimpleSound(1200, 80);
-}
-
-Mix_Chunk* AudioManager::generateUIBeepSound() {
-    return generateSimpleSound(1000, 150);
-}
-
-Mix_Chunk* AudioManager::generateReverbShoeSound() {
-    return generateSimpleSound(600, 200);
-}
-
-Mix_Chunk* AudioManager::generateFootstepSound() {
-    return generateSimpleSound(800, 100);
-}
-
-Mix_Chunk* AudioManager::generateEchoFootstepSound() {
-    return generateSimpleSound(600, 200);
-}
-
-Mix_Chunk* AudioManager::generateReverbFootstepSound() {
-    return generateSimpleSound(600, 200);
-}
-
-int AudioManager::getMasterVolume() const {
-    return masterVolume;
-}
+Mix_Chunk* AudioManager::generateShoeClickSound() { return generateSimpleSound(800, 100); }
+Mix_Chunk* AudioManager::generateFlashlightSound() { return generateSimpleSound(1200, 80); }
+Mix_Chunk* AudioManager::generateUIBeepSound() { return generateSimpleSound(1000, 150); }
+Mix_Chunk* AudioManager::generateReverbShoeSound() { return generateSimpleSound(600, 200); }
+Mix_Chunk* AudioManager::generateFootstepSound() { return generateSimpleSound(800, 100); }
+Mix_Chunk* AudioManager::generateEchoFootstepSound() { return generateSimpleSound(600, 200); }
+Mix_Chunk* AudioManager::generateReverbFootstepSound() { return generateSimpleSound(600, 200); }

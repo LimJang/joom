@@ -1,39 +1,30 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <map>
+#include <utility>
+#include <memory>
+#include "Chunk.h"
 #include "ItemManager.h"
+
+class MapGenerator; // Forward declaration
 
 class Map {
 public:
-    Map(const std::string& mapDir);
+    Map();
     ~Map();
 
-    void loadMap();
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
-    int getTile(int x, int y) const;
-    bool isWall(int x, int y) const;
+    void generateInitialChunk();
+    void checkAndLoadChunks(float playerX, float playerY);
+
     bool isWallAt(float x, float y) const;
     int getWallType(int x, int y) const;
-    bool isExitAt(float x, float y) const;
     
-    // 레벨 관리
-    int getCurrentLevel() const { return currentLevel; }
-    void advanceToNextLevel(ItemManager* itemManager);
-    bool canAdvanceToNextLevel(const ItemManager* itemManager) const;
-    void setupItemsForLevel(ItemManager* itemManager);
+    // These methods will need to be adapted or re-thought for an infinite map
+    int getWidth() const;
+    int getHeight() const;
 
 private:
-    int width, height;
-    int tileSize;
-    std::vector<std::vector<int>> mapData;
-    std::string mapDirectory;
-    int currentLevel;
-
-    void loadDefaultMap();
-    void loadLevel(int levelNumber);
-    bool loadMapFromFile(const std::string& filename);
-    bool isExitTile(int x, int y) const;
-    void createMapDirectory();
-    void createDefaultMapFiles();
+    std::map<std::pair<int, int>, Chunk> chunks;
+    std::unique_ptr<MapGenerator> mapGenerator;
 };

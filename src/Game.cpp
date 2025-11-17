@@ -9,8 +9,7 @@ Game::Game() : window(nullptr), renderer(nullptr), running(false),
                audioManager(nullptr), itemManager(nullptr),
                frameCount(0), fpsTimer(0), currentFPS(60.0f),
                fKeyPressed(false), fKeyWasPressed(false), 
-               isMoving(false), wasMoving(false), lastFrameTime(0),
-               showLevelCompleteMessage(false), levelCompleteTime(0) {
+               isMoving(false), wasMoving(false), lastFrameTime(0) {
 }
 
 Game::~Game() {
@@ -54,30 +53,25 @@ bool Game::initialize(const std::string& resourcePath) {
     }
     
     // 게임 객체들 초기화
-    map = new Map(resourcePath + "maps/");
+    map = new Map();
+    map->generateInitialChunk();
     itemManager = new ItemManager();
     
-    // 레벨 1에 맞는 안전한 시작 위치 찾기
-    float startX = 3.0f, startY = 3.0f;
-    if (map->isWallAt(startX, startY)) {
-        // 안전한 위치를 찾을 때까지 주변 탐색
-        bool found = false;
-        for (int dy = -2; dy <= 2 && !found; dy++) {
-            for (int dx = -2; dx <= 2 && !found; dx++) {
-                float testX = startX + dx;
-                float testY = startY + dy;
-                if (!map->isWallAt(testX, testY) && 
-                    testX > 1.0f && testX < map->getWidth() - 1.0f &&
-                    testY > 1.0f && testY < map->getHeight() - 1.0f) {
-                    startX = testX;
-                    startY = testY;
-                    found = true;
-                }
+    // Find a safe starting position in the initial chunk
+    float startX = 8.5f, startY = 8.5f; // Default fallback
+    bool foundSpawn = false;
+    for (int y = 1; y < CHUNK_SIZE - 1 && !foundSpawn; ++y) {
+        for (int x = 1; x < CHUNK_SIZE - 1 && !foundSpawn; ++x) {
+            if (!map->isWallAt(x, y)) {
+                startX = x + 0.5f;
+                startY = y + 0.5f;
+                foundSpawn = true;
             }
         }
     }
+    std::cout << "Player spawned at safe location: (" << startX << ", " << startY << ")" << std::endl;
     
-    player = new Player(startX, startY, 0.0f);  // 안전한 위치에서 시작
+    player = new Player(startX, startY, 0.0f);
     textureManager = new TextureManager(renderer, resourcePath + "textures/");
     lightSystem = new LightSystem();
     gameRenderer = new Renderer(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, textureManager, lightSystem);
@@ -85,9 +79,6 @@ bool Game::initialize(const std::string& resourcePath) {
 
     // 텍스처 초기화
     gameRenderer->initializeTextures();
-    
-    // 첫 번째 레벨의 아이템들 설정
-    map->setupItemsForLevel(itemManager);
     
     // FPS 타이머 초기화
     fpsTimer = SDL_GetTicks();
@@ -203,6 +194,23 @@ void Game::handleEvents(float deltaTime) {
     if (currentKeyStates[SDL_SCANCODE_ESCAPE]) {
         running = false;
     }
+
+    // Volume controls (handle once per press)
+    static bool minusWasPressed = false;
+    static bool equalsWasPressed = false;
+    bool minusIsPressed = currentKeyStates[SDL_SCANCODE_MINUS];
+    bool equalsIsPressed = currentKeyStates[SDL_SCANCODE_EQUALS];
+
+    if (audioManager && audioManager->isInitialized()) {
+        if (minusIsPressed && !minusWasPressed) {
+            audioManager->decreaseMasterVolume();
+        }
+        if (equalsIsPressed && !equalsWasPressed) {
+            audioManager->increaseMasterVolume();
+        }
+    }
+    minusWasPressed = minusIsPressed;
+    equalsWasPressed = equalsIsPressed;
     
     // 발자국 소리 재생
     if (audioManager && audioManager->isInitialized() && isMoving) {
@@ -224,16 +232,6 @@ void Game::handleEvents(float deltaTime) {
     }
     fKeyWasPressed = fKeyPressed;
     
-    // C키로 커스텀 발자국 토글
-    static bool cKeyPressed = false;
-    static bool cKeyWasPressed = false;
-    cKeyPressed = currentKeyStates[SDL_SCANCODE_C];
-    if (cKeyPressed && !cKeyWasPressed && audioManager && audioManager->isInitialized()) {
-        bool current = audioManager->isUsingCustomFootsteps();
-        audioManager->enableCustomFootsteps(!current);
-    }
-    cKeyWasPressed = cKeyPressed;
-    
     // 조명 조절 키들은 기존과 동일...
     // (간결성을 위해 생략, 필요시 추가)
     
@@ -241,6 +239,9 @@ void Game::handleEvents(float deltaTime) {
 }
 
 void Game::update(float deltaTime) {
+    // 플레이어 위치에 따라 청크 로드
+    map->checkAndLoadChunks(player->getX(), player->getY());
+
     // 아이템 시스템 업데이트
     itemManager->update(deltaTime);
     
@@ -256,16 +257,6 @@ void Game::update(float deltaTime) {
         }
     }
     
-    // 레벨 완료 체크
-    checkLevelCompletion();
-    
-    // 레벨 완료 메시지 처리
-    if (showLevelCompleteMessage) {
-        if (SDL_GetTicks() - levelCompleteTime > 2000) { // 2초 후 다음 레벨
-            handleLevelTransition();
-        }
-    }
-    
     // HUD 업데이트
     hud->setFPS(currentFPS);
     hud->setFlashlightStatus(lightSystem->isFlashlightEnabled());
@@ -278,97 +269,12 @@ void Game::update(float deltaTime) {
     bool hasYellowKey = itemManager->hasKey(ItemType::KEY_YELLOW);
     hud->setKeyStatus(hasRedKey, hasBlueKey, hasYellowKey);
     
-    // 현재 레벨 표시
-    hud->setCurrentLevel(map->getCurrentLevel());
-    
     // 오디오 상태 업데이트
     if (audioManager) {
         hud->setAudioStatus(audioManager->isInitialized(), audioManager->getMasterVolume());
     } else {
         hud->setAudioStatus(false, 0);
     }
-}
-
-void Game::checkLevelCompletion() {
-    // 출구에 도달했는지 확인
-    if (map->isExitAt(player->getX(), player->getY())) {
-        // 필요한 키를 모두 가지고 있는지 확인
-        if (map->canAdvanceToNextLevel(itemManager)) {
-            if (!showLevelCompleteMessage) {
-                showLevelCompleteMessage = true;
-                levelCompleteTime = SDL_GetTicks();
-                
-                std::cout << "🎉 Level " << map->getCurrentLevel() << " Complete!" << std::endl;
-                
-                // 레벨 완료 사운드
-                if (audioManager && audioManager->isInitialized()) {
-                    if (audioManager->isSoundLoaded("victory")) {
-                        audioManager->playSound("victory");
-                    } else {
-                        audioManager->playSound(SoundType::UI_BEEP);
-                    }
-                }
-            }
-        } else {
-            // 키가 부족할 때 알림 (너무 자주 뜨지 않도록 제한)
-            static Uint32 lastWarningTime = 0;
-            Uint32 currentTime = SDL_GetTicks();
-            if (currentTime - lastWarningTime > 1000) { // 1초에 한 번만
-                std::cout << "🚪 You need to collect all required keys to exit this level!" << std::endl;
-                lastWarningTime = currentTime;
-            }
-        }
-    }
-}
-
-void Game::handleLevelTransition() {
-    showLevelCompleteMessage = false;
-    
-    // 다음 레벨로 진행
-    map->advanceToNextLevel(itemManager);
-    
-    // 레벨별 안전한 시작 위치 설정
-    float startX, startY;
-    switch (map->getCurrentLevel()) {
-        case 1:
-            startX = 3.0f; startY = 3.0f; // 레벨 1: 중앙 빈 공간
-            break;
-        case 2:
-            startX = 8.0f; startY = 6.5f; // 레벨 2: 중앙 복도
-            break;
-        case 3:
-            startX = 8.0f; startY = 10.5f; // 레벨 3: 하단 중앙 빈 공간
-            break;
-        default:
-            startX = 2.0f; startY = 2.0f; // 기본값: 맵 좌상단 근처
-            break;
-    }
-    
-    // 선택된 위치가 벽인지 확인하고 안전한 위치 찾기
-    if (map->isWallAt(startX, startY)) {
-        // 안전한 위치를 찾을 때까지 주변 탐색
-        bool found = false;
-        for (int dy = -2; dy <= 2 && !found; dy++) {
-            for (int dx = -2; dx <= 2 && !found; dx++) {
-                float testX = startX + dx;
-                float testY = startY + dy;
-                if (!map->isWallAt(testX, testY) && 
-                    testX > 1.0f && testX < map->getWidth() - 1.0f &&
-                    testY > 1.0f && testY < map->getHeight() - 1.0f) {
-                    startX = testX;
-                    startY = testY;
-                    found = true;
-                }
-            }
-        }
-    }
-    
-    // 플레이어를 안전한 시작 위치로 이동
-    player->setPosition(startX, startY);
-    player->setAngle(0.0f);
-    
-    std::cout << "🗝️  Level " << map->getCurrentLevel() << " - Find the keys to unlock the exit!" << std::endl;
-    std::cout << "👤 Player spawned at (" << startX << ", " << startY << ")" << std::endl;
 }
 
 void Game::render() {
@@ -382,10 +288,6 @@ void Game::render() {
     gameRenderer->renderMiniMap(player, map);
     hud->render();
     
-    if (showLevelCompleteMessage) {
-        hud->renderLevelCompleteMessage(map->getCurrentLevel());
-    }
-
     // 최종 결과물을 화면에 표시
     SDL_RenderPresent(renderer);
 }

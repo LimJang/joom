@@ -32,6 +32,7 @@ set(SOURCES
     src/LightSystem.cpp
     src/AudioManager.cpp
     src/ItemManager.cpp
+    src/MapGenerator.cpp
 )
 
 # Create executable
