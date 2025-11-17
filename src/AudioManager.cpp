@@ -12,7 +12,7 @@
 AudioManager::AudioManager() 
     : backgroundMusic(nullptr), initialized(false), 
       masterVolume(70), sfxVolume(80), musicVolume(50),
-      lastFootstepTime(0), useCustomFootsteps(false) {
+      lastFootstepTime(0), useCustomFootsteps(false), nextFootstepIsLeft(true) {
 }
 
 AudioManager::~AudioManager() {
@@ -281,20 +281,16 @@ void AudioManager::playFootstep() {
     Uint32 currentTime = SDL_GetTicks();
     if (currentTime - lastFootstepTime >= FOOTSTEP_INTERVAL) {
         
-        if (useCustomFootsteps && !customFootstepSounds.empty()) {
-            playCustomFootstep();
+        if (nextFootstepIsLeft) {
+            if (isSoundLoaded("footstep1")) {
+                playSound("footstep1");
+            }
         } else {
-            // 기본 발자국 시스템
-            static std::random_device rd;
-            static std::mt19937 gen(rd());
-            static std::uniform_int_distribution<> dis(0, 1);
-            
-            if (dis(gen) == 0) {
-                playSound(SoundType::ECHO_FOOTSTEP);
-            } else {
-                playSound(SoundType::FOOTSTEP_STONE);
+            if (isSoundLoaded("footstep2")) {
+                playSound("footstep2");
             }
         }
+        nextFootstepIsLeft = !nextFootstepIsLeft;
         
         lastFootstepTime = currentTime;
     }

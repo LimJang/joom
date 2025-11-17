@@ -6,12 +6,50 @@ TextureManager::TextureManager(SDL_Renderer* renderer, const std::string& textur
     : renderer(renderer), textureDirectory(textureDir) {}
 
 TextureManager::~TextureManager() {
+    cleanup();
+}
+
+void TextureManager::cleanup() {
     for (auto& pair : textures) {
         if (pair.second) {
             SDL_DestroyTexture(pair.second);
         }
     }
     textures.clear();
+    texturePixels.clear();
+    textureWidths.clear();
+    textureHeights.clear();
+}
+
+bool TextureManager::cacheTexturePixels(const std::string& name, SDL_Texture* texture) {
+    int width, height;
+    SDL_QueryTexture(texture, NULL, NULL, &width, &height);
+
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_ARGB8888);
+    if (!surface) {
+        std::cerr << "Failed to create surface for caching texture: " << SDL_GetError() << std::endl;
+        return false;
+    }
+
+    // This is a workaround. Ideally, we'd get the pixel data directly.
+    // For now, we render the texture to a surface to read its pixels.
+    SDL_Texture* tempTarget = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width, height);
+    SDL_SetRenderTarget(renderer, tempTarget);
+    SDL_RenderCopy(renderer, texture, NULL, NULL);
+    SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_ARGB8888, surface->pixels, surface->pitch);
+    SDL_SetRenderTarget(renderer, nullptr);
+    SDL_DestroyTexture(tempTarget);
+
+    std::vector<Uint32> pixels(width * height);
+    memcpy(pixels.data(), surface->pixels, surface->pitch * height);
+    
+    SDL_FreeSurface(surface);
+
+    texturePixels[name] = pixels;
+    textureWidths[name] = width;
+    textureHeights[name] = height;
+
+    return true;
 }
 
 bool TextureManager::loadTexture(const std::string& name, const std::string& filePath) {
@@ -26,6 +64,13 @@ bool TextureManager::loadTexture(const std::string& name, const std::string& fil
         SDL_DestroyTexture(textures[name]);
     }
     textures[name] = texture;
+
+    // 픽셀 데이터 캐시
+    if (!cacheTexturePixels(name, texture)) {
+        std::cerr << "Failed to cache pixels for texture: " << name << std::endl;
+        return false;
+    }
+
     return true;
 }
 
@@ -37,10 +82,9 @@ bool TextureManager::createWallTexture(const std::string& id, int width, int hei
         return false;
     }
     
-    // 텍스처를 렌더 타겟으로 설정
     SDL_SetRenderTarget(renderer, texture);
     
-    // 텍스처 패턴 생성
+    // ... (패턴 생성 코드는 동일)
     switch (type) {
         case 0: // 벽돌 패턴
             {
@@ -56,7 +100,6 @@ bool TextureManager::createWallTexture(const std::string& id, int width, int hei
                     }
                 }
                 
-                // 벽돌 사이 선
                 SDL_SetRenderDrawColor(renderer, 101, 67, 33, 255); // 어두운 갈색
                 for (int y = 0; y < height; y += 16) {
                     SDL_RenderDrawLine(renderer, 0, y, width, y);
@@ -69,39 +112,29 @@ bool TextureManager::createWallTexture(const std::string& id, int width, int hei
                 }
             }
             break;
-            
         case 1: // 돌 패턴
             {
                 SDL_SetRenderDrawColor(renderer, 105, 105, 105, 255); // 회색 베이스
                 SDL_RenderClear(renderer);
-                
-                // 무작위 돌 패턴
                 for (int i = 0; i < 100; i++) {
                     int x = (i * 17) % width;
                     int y = (i * 23) % height;
                     int size = 3 + (i % 5);
-                    
                     Uint8 brightness = 80 + (i % 50);
                     SDL_SetRenderDrawColor(renderer, brightness, brightness, brightness, 255);
-                    
                     SDL_Rect stone = {x, y, size, size};
                     SDL_RenderFillRect(renderer, &stone);
                 }
             }
             break;
-            
         case 2: // 금속 패턴
             {
                 SDL_SetRenderDrawColor(renderer, 70, 70, 80, 255); // 어두운 금속색
                 SDL_RenderClear(renderer);
-                
-                // 수직 금속 판 패턴
                 SDL_SetRenderDrawColor(renderer, 90, 90, 100, 255);
                 for (int x = 8; x < width; x += 16) {
                     SDL_RenderDrawLine(renderer, x, 0, x, height);
                 }
-                
-                // 수평 리벳
                 SDL_SetRenderDrawColor(renderer, 110, 110, 120, 255);
                 for (int y = 8; y < height; y += 24) {
                     for (int x = 4; x < width; x += 16) {
@@ -111,18 +144,16 @@ bool TextureManager::createWallTexture(const std::string& id, int width, int hei
                 }
             }
             break;
-            
-        default: // 기본 패턴
+        default:
             SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
             SDL_RenderClear(renderer);
             break;
     }
     
-    // 렌더 타겟을 다시 화면으로 복원
     SDL_SetRenderTarget(renderer, nullptr);
     
     textures[id] = texture;
-    return true;
+    return cacheTexturePixels(id, texture);
 }
 
 bool TextureManager::createFloorTexture(const std::string& id, int width, int height) {
@@ -135,15 +166,13 @@ bool TextureManager::createFloorTexture(const std::string& id, int width, int he
     
     SDL_SetRenderTarget(renderer, texture);
     
-    // 체크무늬 바닥 패턴
     for (int y = 0; y < height; y += 16) {
         for (int x = 0; x < width; x += 16) {
             if ((x/16 + y/16) % 2 == 0) {
-                SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255); // 어두운 회색
+                SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255);
             } else {
-                SDL_SetRenderDrawColor(renderer, 96, 96, 96, 255); // 밝은 회색
+                SDL_SetRenderDrawColor(renderer, 96, 96, 96, 255);
             }
-            
             SDL_Rect tile = {x, y, 16, 16};
             SDL_RenderFillRect(renderer, &tile);
         }
@@ -152,7 +181,39 @@ bool TextureManager::createFloorTexture(const std::string& id, int width, int he
     SDL_SetRenderTarget(renderer, nullptr);
     
     textures[id] = texture;
-    return true;
+    return cacheTexturePixels(id, texture);
+}
+
+bool TextureManager::createCeilingTexture(const std::string& id, int width, int height) {
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+                                           SDL_TEXTUREACCESS_TARGET, width, height);
+    if (!texture) {
+        std::cerr << "Failed to create ceiling texture - " << SDL_GetError() << std::endl;
+        return false;
+    }
+
+    SDL_SetRenderTarget(renderer, texture);
+
+    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
+    for (int i = 0; i < width; i += 16) {
+        SDL_RenderDrawLine(renderer, i, 0, i, height);
+        SDL_RenderDrawLine(renderer, 0, i, width, i);
+    }
+
+    SDL_SetRenderDrawColor(renderer, 80, 80, 90, 255);
+    for (int y = 0; y < height; y += 16) {
+        for (int x = 0; x < width; x += 16) {
+            SDL_RenderDrawPoint(renderer, x, y);
+        }
+    }
+
+    SDL_SetRenderTarget(renderer, nullptr);
+
+    textures[id] = texture;
+    return cacheTexturePixels(id, texture);
 }
 
 SDL_Texture* TextureManager::getTexture(const std::string& id) {
@@ -163,19 +224,32 @@ SDL_Texture* TextureManager::getTexture(const std::string& id) {
     return nullptr;
 }
 
-void TextureManager::cleanup() {
-    for (auto& pair : textures) {
-        SDL_DestroyTexture(pair.second);
+const std::vector<Uint32>* TextureManager::getPixels(const std::string& name, int& width, int& height) {
+    auto it = texturePixels.find(name);
+    if (it == texturePixels.end()) {
+        width = 0;
+        height = 0;
+        return nullptr;
     }
-    textures.clear();
+    width = textureWidths[name];
+    height = textureHeights[name];
+    return &it->second;
 }
 
-Uint32 TextureManager::sampleTexture(const std::string& id, float u, float v) {
-    // 간단한 텍스처 샘플링 (실제 구현은 복잡하지만 여기서는 기본 색상 반환)
-    if (id == "wall_brick") return 0xFF8B4513; // 갈색
-    if (id == "wall_stone") return 0xFF696969; // 회색
-    if (id == "wall_metal") return 0xFF464650; // 어두운 금속색
-    if (id == "floor") return 0xFF404040; // 어두운 회색
-    
-    return 0xFFFFFFFF; // 기본 흰색
+Uint32 TextureManager::sampleTexture(const std::string& name, float u, float v) {
+    auto it = texturePixels.find(name);
+    if (it == texturePixels.end()) {
+        return 0xFFFFFFFF; // 흰색 에러 색상
+    }
+
+    const auto& pixels = it->second;
+    int width = textureWidths[name];
+    int height = textureHeights[name];
+
+    int texX = static_cast<int>(u * width) % width;
+    int texY = static_cast<int>(v * height) % height;
+    if (texX < 0) texX += width;
+    if (texY < 0) texY += height;
+
+    return pixels[texY * width + texX];
 }

@@ -1,5 +1,9 @@
 #pragma once
 #include <SDL2/SDL.h>
+
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 600;
+
 #include "Player.h"
 #include "Map.h"
 #include "Renderer.h"
@@ -24,13 +28,8 @@ private:
     LightSystem* lightSystem;
     AudioManager* audioManager;
     ItemManager* itemManager;
-    Monster* monster;
-    Pathfinder* pathfinder;
     
-    const int WINDOW_WIDTH = 800;
-    const int WINDOW_HEIGHT = 600;
-    
-    // FPS 계산
+    // FPS Calculation
     Uint32 frameCount;
     Uint32 fpsTimer;
     float currentFPS;

@@ -6,7 +6,7 @@
 Game::Game() : window(nullptr), renderer(nullptr), running(false), 
                player(nullptr), map(nullptr), gameRenderer(nullptr),
                textureManager(nullptr), hud(nullptr), lightSystem(nullptr),
-               audioManager(nullptr), itemManager(nullptr), monster(nullptr), pathfinder(nullptr),
+               audioManager(nullptr), itemManager(nullptr),
                frameCount(0), fpsTimer(0), currentFPS(60.0f),
                fKeyPressed(false), fKeyWasPressed(false), 
                isMoving(false), wasMoving(false), lastFrameTime(0),
@@ -83,10 +83,6 @@ bool Game::initialize(const std::string& resourcePath) {
     gameRenderer = new Renderer(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, textureManager, lightSystem);
     hud = new HUD(renderer, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    // 경로 탐색기 및 몬스터 초기화
-    pathfinder = new Pathfinder();
-    monster = new Monster(10.5f, 5.5f); // 레벨 1의 특정 위치에 몬스터 생성
-    
     // 텍스처 초기화
     gameRenderer->initializeTextures();
     
@@ -245,23 +241,6 @@ void Game::handleEvents(float deltaTime) {
 }
 
 void Game::update(float deltaTime) {
-    // 몬스터 업데이트
-    if (monster && pathfinder) {
-        monster->update(player, map, pathfinder, audioManager, deltaTime);
-    }
-
-    // 몬스터와 플레이어 충돌 검사
-    if (monster) {
-        float dx = player->getX() - monster->getX();
-        float dy = player->getY() - monster->getY();
-        float distance = sqrt(dx * dx + dy * dy);
-
-        if (distance < 0.8f) { // 충돌 반경 증가
-            std::cout << "Player collided with the monster! Game Over." << std::endl;
-            running = false; // 게임 루프를 정상적으로 종료
-        }
-    }
-
     // 아이템 시스템 업데이트
     itemManager->update(deltaTime);
     
@@ -393,35 +372,25 @@ void Game::handleLevelTransition() {
 }
 
 void Game::render() {
-    gameRenderer->clear();
-    gameRenderer->render3D(player, map);
-    
-    // 아이템 렌더링 (간단한 색깔 점으로 표시)
-    for (const Item& item : itemManager->getItems()) {
-        if (!item.collected) {
-            gameRenderer->renderItem(item, player, lightSystem);
-        }
-    }
+    // 3D 월드를 버퍼에 렌더링
+    gameRenderer->render(player, map, itemManager->getItems(), nullptr);
 
-    // 몬스터 렌더링
-    if (monster) {
-        gameRenderer->renderMonster(monster, player, lightSystem);
-    }
-    
+    // 버퍼를 화면에 복사
+    gameRenderer->present();
+
+    // 2D UI 요소들을 화면에 직접 렌더링 (3D 월드 위에)
     gameRenderer->renderMiniMap(player, map);
     hud->render();
     
-    // 레벨 완료 메시지 표시
     if (showLevelCompleteMessage) {
         hud->renderLevelCompleteMessage(map->getCurrentLevel());
     }
-    
-    gameRenderer->present();
+
+    // 최종 결과물을 화면에 표시
+    SDL_RenderPresent(renderer);
 }
 
 void Game::cleanup() {
-    delete monster;
-    delete pathfinder;
     delete itemManager;
     delete hud;
     delete gameRenderer;

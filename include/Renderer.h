@@ -6,45 +6,38 @@
 #include "LightSystem.h"
 #include "ItemManager.h"
 
-class Monster; // 몬스터 클래스 전방 선언
+class Monster;
 
 class Renderer {
+public:
+    Renderer(SDL_Renderer* sdlRenderer, int width, int height, TextureManager* texMgr, LightSystem* lights);
+    ~Renderer();
+
+    void initializeTextures();
+    void render(Player* player, Map* map, const std::vector<Item>& items, const Monster* monster);
+    void present();
+    void renderMiniMap(Player* player, Map* map); // 미니맵은 버퍼링 없이 직접 렌더링
+
 private:
+    void renderFloorAndCeiling(Player* player, Uint32* pixels);
+    void renderWalls(Player* player, Map* map, Uint32* pixels);
+    void renderSprites(Player* player, const std::vector<Item>& items, const Monster* monster, Uint32* pixels);
+
+    Uint32 applyLighting(Uint32 color, float lighting) const;
+
     SDL_Renderer* renderer;
+    SDL_Texture* screenBuffer;
     int screenWidth, screenHeight;
     TextureManager* textureManager;
     LightSystem* lightSystem;
     std::vector<float> depthBuffer;
-    
-    // 레이캐스팅 설정
-    static constexpr float FOV = 60.0f;  // 시야각 (도)
-    static constexpr float RAY_STEP = 0.1f;
-    static constexpr float MAX_DISTANCE = 20.0f;
-    
-public:
-    Renderer(SDL_Renderer* sdlRenderer, int width, int height, TextureManager* texMgr, LightSystem* lights);
-    ~Renderer();
-    
-    // 텍스처 초기화
-    void initializeTextures();
-    
-    void render3D(Player* player, Map* map);
-    void renderMiniMap(Player* player, Map* map);
-    void renderFloorAndCeiling(Player* player, Map* map);
-    void renderItem(const Item& item, Player* player, LightSystem* lightSystem);
-    void renderMonster(const Monster* monster, Player* player, LightSystem* lightSystem);
-    void clear();
-    void present();
-    
-private:
-    float castRay(float startX, float startY, float angle, Map* map, int& wallType, float& hitX, float& hitY);
-    void drawTexturedVerticalLine(int x, int wallHeight, int wallType, float textureX, float lighting);
-    void drawVerticalLine(int x, int height, int color);
-    void drawItemSprite(int screenX, int screenY, int size, ItemType type, float lighting, float animationTime);
-    void drawKeySprite(int screenX, int screenY, int size, Uint8 r, Uint8 g, Uint8 b);
-    void drawMonsterSprite(int screenX, int screenY, int size, float lighting, float animationTime);
+
+    // Profiling
+    Uint32 profilingTimer;
+    Uint32 wallTimeAccumulator;
+    Uint32 floorTimeAccumulator;
+    int frameCounterForProfile;
+
+    static constexpr float FOV = 60.0f;
     float degreesToRadians(float degrees);
-    
-    // 아이템 색상 반환
-    SDL_Color getItemColor(ItemType type);
 };

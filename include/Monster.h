@@ -21,7 +21,6 @@ public:
     ~Monster();
 
     void update(Player* player, Map* map, Pathfinder* pathfinder, AudioManager* audioManager, float deltaTime);
-    void render(Renderer* renderer, Player* player, LightSystem* lightSystem) const;
 
     float getX() const { return x; }
     float getY() const { return y; }

@@ -32,8 +32,6 @@ set(SOURCES
     src/LightSystem.cpp
     src/AudioManager.cpp
     src/ItemManager.cpp
-    src/Monster.cpp
-    src/Pathfinder.cpp
 )
 
 # Create executable

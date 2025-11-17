@@ -91,8 +91,3 @@ void Monster::followPath(Player* player, float deltaTime) {
     }
 }
 
-void Monster::render(Renderer* renderer, Player* player, LightSystem* lightSystem) const {
-    // 렌더러에 몬스터를 그리는 기능은 Renderer 클래스에 구현해야 함
-    // 여기서는 Renderer의 해당 함수를 호출만 함
-    renderer->renderMonster(this, player, lightSystem);
-}

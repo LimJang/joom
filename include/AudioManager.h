@@ -91,6 +91,7 @@ private:
     // 발자국 관련
     std::vector<SoundType> customFootstepSounds;
     bool useCustomFootsteps;
+    bool nextFootstepIsLeft;
     Uint32 lastFootstepTime;
     static constexpr Uint32 FOOTSTEP_INTERVAL = 350; // ms
 

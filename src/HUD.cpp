@@ -265,15 +265,13 @@ void HUD::renderControls() {
     // 컨트롤 가이드 (키 수집 게임에 맞게 업데이트)
     renderText("CONTROLS", x, y, 1);
     renderText("WASD: MOVE", x, y + 15, 1);
-    renderText("ARROWS: TURN", x, y + 25, 1);
-    renderText("F: FLASHLIGHT", x, y + 35, 1);
-    renderText("FIND KEYS TO EXIT", x, y + 45, 1);
+    renderText("F: FLASHLIGHT", x, y + 25, 1);
     
     if (audioEnabled) {
-        renderText("+/-: VOLUME", x, y + 55, 1);
+        renderText("+/-: VOLUME", x, y + 35, 1);
     }
     
-    renderText("ESC: EXIT", x, y + 65, 1);
+    renderText("ESC: EXIT", x, y + 45, 1);
 }
 
 // 기존의 renderNumber, renderDigit, renderText, renderChar, drawRect, drawFilledRect 함수들은 동일...

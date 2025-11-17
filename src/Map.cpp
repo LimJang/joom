@@ -166,6 +166,11 @@ void Map::setupItemsForLevel(ItemManager* itemManager) {
             
             if (iss >> x >> y >> typeInt) {
                 ItemType type = static_cast<ItemType>(typeInt);
+
+                // Filter out keys and health packs
+                if (type == ItemType::KEY_RED || type == ItemType::KEY_BLUE || type == ItemType::KEY_YELLOW || type == ItemType::HEALTH_PACK) {
+                    continue; // Skip adding these items
+                }
                 
                 // 키 아이템의 경우 이미 수집했는지 확인
                 bool shouldAdd = true;
@@ -271,20 +276,7 @@ int Map::getWallType(int x, int y) const {
 }
 
 bool Map::canAdvanceToNextLevel(const ItemManager* itemManager) const {
-    if (!itemManager) return false;
-    
-    // 레벨별 필요 키 체크
-    switch (currentLevel) {
-        case 1:
-            return itemManager->hasKey(ItemType::KEY_RED);
-        case 2:
-            return itemManager->hasKey(ItemType::KEY_RED) && 
-                   itemManager->hasKey(ItemType::KEY_BLUE);
-        case 3:
-            return itemManager->hasAllKeys();
-        default:
-            return true; // 정의되지 않은 레벨은 항상 진행 가능
-    }
+    return true; // Keys are no longer required
 }
 
 void Map::advanceToNextLevel(ItemManager* itemManager) {
